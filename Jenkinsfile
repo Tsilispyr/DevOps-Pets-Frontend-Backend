@@ -3,15 +3,6 @@ pipeline {
 
     tools {
         maven 'Maven 3.9.5'
-        jdk 'JDK 17'
-        nodejs 'NodeJS 18'
-    }
-
-    environment {
-        JAVA_HOME = tool('JDK 17')
-        MAVEN_HOME = tool('Maven 3.9.5')
-        NODE_HOME = tool('NodeJS 18')
-        PATH = "${env.JAVA_HOME}/bin:${env.MAVEN_HOME}/bin:${env.NODE_HOME}/bin:${env.PATH}"
     }
 
     stages {
