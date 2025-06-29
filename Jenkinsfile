@@ -11,6 +11,7 @@ pipeline {
         FRONTEND_IMAGE = 'devops-pets-frontend'
         IMAGE_TAG = "${BUILD_NUMBER}"
         NAMESPACE = "devops-pets"
+        CLUSTER_NAME = "devops-pets"
         TIMEOUT = "300s"
     }
 
@@ -21,6 +22,39 @@ pipeline {
             }
         }
 
+        stage('Setup Docker Registry') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo "========================================"
+                    echo "STEP 1: SETTING UP DOCKER REGISTRY"
+                    echo "========================================"
+                    
+                    // Start local Docker registry if not running
+                    sh '''
+                        if ! docker ps | grep -q docker-registry; then
+                            echo "Starting local Docker registry..."
+                            docker run -d \
+                              --name docker-registry \
+                              --restart=always \
+                              -p 5000:5000 \
+                              -v registry-data:/var/lib/registry \
+                              registry:2
+                            echo "OK! Docker registry started"
+                        else
+                            echo "OK! Docker registry already running"
+                        fi
+                        
+                        # Wait for registry to be ready
+                        sleep 5
+                        curl -s http://localhost:5000/v2/_catalog || echo "Registry not ready yet, will be available soon"
+                    '''
+                }
+            }
+        }
+
         stage('Complete Cleanup') {
             when {
                 branch 'main'
@@ -28,7 +62,7 @@ pipeline {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 1: COMPLETE CLEANUP"
+                    echo "STEP 2: COMPLETE CLEANUP"
                     echo "========================================"
                     
                     withCredentials([string(credentialsId: 'jenkins-kubeconfig-text', variable: 'KUBECONFIG_CONTENT')]) {
@@ -94,7 +128,7 @@ pipeline {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 2: BUILDING AND PUSHING DOCKER IMAGES"
+                    echo "STEP 3: BUILDING AND PUSHING DOCKER IMAGES"
                     echo "========================================"
                     
                     // Build backend image
@@ -130,6 +164,32 @@ pipeline {
             }
         }
 
+        stage('Load Images to Cluster') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo "========================================"
+                    echo "STEP 4: LOADING IMAGES TO CLUSTER"
+                    echo "========================================"
+                    
+                    withCredentials([string(credentialsId: 'jenkins-kubeconfig-text', variable: 'KUBECONFIG_CONTENT')]) {
+                        writeFile file: 'jenkins-kubeconfig', text: env.KUBECONFIG_CONTENT
+                        
+                        // Load images into kind cluster
+                        sh '''
+                            export KUBECONFIG=$PWD/jenkins-kubeconfig
+                            echo "Loading images into kind cluster..."
+                            kind load docker-image ${DOCKER_REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG} --name ${CLUSTER_NAME}
+                            kind load docker-image ${DOCKER_REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG} --name ${CLUSTER_NAME}
+                            echo "OK! Images loaded successfully"
+                        '''
+                    }
+                }
+            }
+        }
+
         stage('Update Kubernetes Manifests') {
             when {
                 branch 'main'
@@ -137,7 +197,7 @@ pipeline {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 3: UPDATING KUBERNETES MANIFESTS"
+                    echo "STEP 5: UPDATING KUBERNETES MANIFESTS"
                     echo "========================================"
                     
                     // Update backend deployment with new image
@@ -162,7 +222,7 @@ pipeline {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 4: DEPLOYING TO KUBERNETES"
+                    echo "STEP 6: DEPLOYING TO KUBERNETES"
                     echo "========================================"
                     
                     withCredentials([string(credentialsId: 'jenkins-kubeconfig-text', variable: 'KUBECONFIG_CONTENT')]) {
@@ -194,6 +254,76 @@ pipeline {
             }
         }
 
+        stage('Setup Port Forwarding') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo "========================================"
+                    echo "STEP 7: SETTING UP PORT FORWARDING"
+                    echo "========================================"
+                    
+                    withCredentials([string(credentialsId: 'jenkins-kubeconfig-text', variable: 'KUBECONFIG_CONTENT')]) {
+                        writeFile file: 'jenkins-kubeconfig', text: env.KUBECONFIG_CONTENT
+                        
+                        // Kill any existing port forwards
+                        sh '''
+                            export KUBECONFIG=$PWD/jenkins-kubeconfig
+                            pkill -f "kubectl port-forward.*backend" || true
+                            pkill -f "kubectl port-forward.*frontend" || true
+                            sleep 2
+                        '''
+                        
+                        // Start backend port forward
+                        sh '''
+                            export KUBECONFIG=$PWD/jenkins-kubeconfig
+                            echo "Starting backend port forward (30080:8080)..."
+                            kubectl port-forward -n ${NAMESPACE} service/backend 30080:8080 &
+                            BACKEND_PID=$!
+                            echo $BACKEND_PID > /tmp/backend-port-forward.pid
+                            echo "OK! Backend port forward is running (PID: $BACKEND_PID)"
+                        '''
+                        
+                        // Start frontend port forward
+                        sh '''
+                            export KUBECONFIG=$PWD/jenkins-kubeconfig
+                            echo "Starting frontend port forward (30000:80)..."
+                            kubectl port-forward -n ${NAMESPACE} service/frontend 30000:80 &
+                            FRONTEND_PID=$!
+                            echo $FRONTEND_PID > /tmp/frontend-port-forward.pid
+                            echo "OK! Frontend port forward is running (PID: $FRONTEND_PID)"
+                        '''
+                        
+                        // Wait for port forwards to establish
+                        sh '''
+                            echo "Waiting for port forwards to establish..."
+                            sleep 5
+                            
+                            # Check if port forwards are running
+                            if [ -f /tmp/backend-port-forward.pid ]; then
+                                BACKEND_PID=$(cat /tmp/backend-port-forward.pid)
+                                if kill -0 $BACKEND_PID 2>/dev/null; then
+                                    echo "OK! Backend port forward is running"
+                                else
+                                    echo "ERR! Backend port forward failed to start"
+                                fi
+                            fi
+                            
+                            if [ -f /tmp/frontend-port-forward.pid ]; then
+                                FRONTEND_PID=$(cat /tmp/frontend-port-forward.pid)
+                                if kill -0 $FRONTEND_PID 2>/dev/null; then
+                                    echo "OK! Frontend port forward is running"
+                                else
+                                    echo "ERR! Frontend port forward failed to start"
+                                fi
+                            fi
+                        '''
+                    }
+                }
+            }
+        }
+
         stage('Verify Deployment') {
             when {
                 branch 'main'
@@ -201,7 +331,7 @@ pipeline {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 5: VERIFYING DEPLOYMENT"
+                    echo "STEP 8: VERIFYING DEPLOYMENT"
                     echo "========================================"
                     
                     withCredentials([string(credentialsId: 'jenkins-kubeconfig-text', variable: 'KUBECONFIG_CONTENT')]) {
@@ -260,6 +390,13 @@ pipeline {
             - MailHog UI: http://localhost:8025
             - PostgreSQL: localhost:5432
             - Docker Registry: http://localhost:5000
+            
+            ========================================
+            PORT FORWARDING STATUS
+            ========================================
+            Backend port forward: Running on localhost:30080
+            Frontend port forward: Running on localhost:30000
+            PID files: /tmp/backend-port-forward.pid, /tmp/frontend-port-forward.pid
             
             ========================================
             USEFUL COMMANDS
