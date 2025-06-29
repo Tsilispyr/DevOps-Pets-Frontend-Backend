@@ -13,6 +13,15 @@ spec:
       labels:
         app: frontend
     spec:
+      initContainers:
+        - name: copy-files
+          image: busybox:latest
+          command: ['sh', '-c', 'cp -r /shared/frontend/* /usr/share/nginx/html/ && echo "Frontend files copied successfully"']
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /shared
+            - name: frontend-files
+              mountPath: /usr/share/nginx/html
       containers:
         - name: frontend
           image: nginx:stable-alpine
@@ -24,6 +33,7 @@ spec:
               mountPath: /usr/share/nginx/html
       volumes:
         - name: frontend-files
-          hostPath:
-            path: /var/jenkins_home/jobs/Devpets/workspace/frontend/dist
-            type: Directory
+          emptyDir: {}
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: shared-storage

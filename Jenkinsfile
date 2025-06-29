@@ -109,17 +109,14 @@ EOF
                         echo "Deleting existing deployments..."
                         kubectl delete deployment backend -n ${NAMESPACE} --ignore-not-found=true || true
                         kubectl delete deployment frontend -n ${NAMESPACE} --ignore-not-found=true || true
-                        kubectl delete deployment postgres -n ${NAMESPACE} --ignore-not-found=true || true
                         
                         echo "Deleting existing services..."
                         kubectl delete service backend -n ${NAMESPACE} --ignore-not-found=true || true
                         kubectl delete service frontend -n ${NAMESPACE} --ignore-not-found=true || true
-                        kubectl delete service postgres -n ${NAMESPACE} --ignore-not-found=true || true
                         
                         echo "Deleting any orphaned pods..."
                         kubectl delete pods -l app=backend -n ${NAMESPACE} --ignore-not-found=true || true
                         kubectl delete pods -l app=frontend -n ${NAMESPACE} --ignore-not-found=true || true
-                        kubectl delete pods -l app=postgres -n ${NAMESPACE} --ignore-not-found=true || true
                         
                         echo "Waiting for resources to be deleted..."
                         sleep 10
@@ -366,26 +363,49 @@ EOF
                         echo "OK! Frontend pod is created"
                     '''
                     
-                    // Copy files to pods immediately
+                    // Copy files to shared storage
                     sh '''
-                        echo "Copying files to pods..."
+                        echo "Copying files to shared storage..."
                         
-                        # Get pod names
-                        BACKEND_POD=$(kubectl get pods -l app=backend -n ${NAMESPACE} -o jsonpath='{.items[0].metadata.name}')
-                        FRONTEND_POD=$(kubectl get pods -l app=frontend -n ${NAMESPACE} -o jsonpath='{.items[0].metadata.name}')
+                        # Create a temporary pod to copy files to shared storage
+                        echo "Creating temporary pod for file copying..."
+                        cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: file-copy-pod
+  namespace: ${NAMESPACE}
+spec:
+  containers:
+  - name: file-copy
+    image: busybox:latest
+    command: ['sh', '-c', 'sleep 3600']
+    volumeMounts:
+    - name: shared-storage
+      mountPath: /shared
+  volumes:
+  - name: shared-storage
+    persistentVolumeClaim:
+      claimName: shared-storage
+  restartPolicy: Never
+EOF
                         
-                        echo "Backend pod: $BACKEND_POD"
-                        echo "Frontend pod: $FRONTEND_POD"
+                        # Wait for the pod to be ready
+                        kubectl wait --for=condition=ready pod/file-copy-pod -n ${NAMESPACE} --timeout=60s
                         
-                        # Copy JAR to backend pod
-                        echo "Copying JAR to backend pod..."
-                        kubectl cp Ask/target/app.jar ${NAMESPACE}/$BACKEND_POD:/app/app.jar
-                        echo "OK! JAR copied to backend pod"
+                        # Copy JAR to shared storage
+                        echo "Copying JAR to shared storage..."
+                        kubectl cp Ask/target/app.jar ${NAMESPACE}/file-copy-pod:/shared/app.jar
+                        echo "OK! JAR copied to shared storage"
                         
-                        # Copy dist files to frontend pod
-                        echo "Copying dist files to frontend pod..."
-                        kubectl cp frontend/dist/ ${NAMESPACE}/$FRONTEND_POD:/usr/share/nginx/html/
-                        echo "OK! Dist files copied to frontend pod"
+                        # Copy frontend files to shared storage
+                        echo "Copying frontend files to shared storage..."
+                        kubectl cp frontend/dist/ ${NAMESPACE}/file-copy-pod:/shared/frontend/
+                        echo "OK! Frontend files copied to shared storage"
+                        
+                        # Delete the temporary pod
+                        kubectl delete pod file-copy-pod -n ${NAMESPACE}
+                        echo "OK! Temporary pod deleted"
                     '''
                     
                     // Now wait for pods to be ready

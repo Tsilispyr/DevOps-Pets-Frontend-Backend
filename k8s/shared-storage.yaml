@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-storage
+  namespace: devops-pets
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: shared-storage-pv
+spec:
+  capacity:
+    storage: 100Mi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: /tmp/shared-storage
+  storageClassName: ""
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: shared-storage
+    namespace: devops-pets 

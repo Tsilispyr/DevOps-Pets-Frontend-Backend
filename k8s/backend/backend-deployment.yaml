@@ -13,6 +13,15 @@ spec:
       labels:
         app: backend
     spec:
+      initContainers:
+        - name: copy-jar
+          image: busybox:latest
+          command: ['sh', '-c', 'cp /shared/app.jar /app/app.jar && echo "JAR copied successfully"']
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /shared
+            - name: app-jar
+              mountPath: /app
       containers:
         - name: backend
           image: openjdk:17-jdk-slim
@@ -40,6 +49,7 @@ spec:
               mountPath: /app
       volumes:
         - name: app-jar
-          hostPath:
-            path: /var/jenkins_home/jobs/Devpets/workspace/Ask/target
-            type: Directory
+          emptyDir: {}
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: shared-storage
