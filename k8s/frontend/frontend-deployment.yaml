@@ -14,7 +14,15 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: localhost:5000/devops-pets-frontend:latest
-          imagePullPolicy: Always
+          image: nginx:stable-alpine
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
+          volumeMounts:
+            - name: frontend-files
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: frontend-files
+          hostPath:
+            path: /var/jenkins_home/jobs/Devpets/workspace/frontend/dist
+            type: Directory

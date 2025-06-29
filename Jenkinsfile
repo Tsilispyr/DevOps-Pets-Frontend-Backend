@@ -6,12 +6,7 @@ pipeline {
     }
 
     environment {
-        DOCKER_REGISTRY = 'localhost:5000'
-        BACKEND_IMAGE = 'devops-pets-backend'
-        FRONTEND_IMAGE = 'devops-pets-frontend'
-        IMAGE_TAG = "${BUILD_NUMBER}"
         NAMESPACE = "devops-pets"
-        CLUSTER_NAME = "devops-pets"
         TIMEOUT = "300s"
     }
 
@@ -29,22 +24,23 @@ pipeline {
                     echo "STEP 1: SETTING UP KUBECONFIG"
                     echo "========================================"
                     
-                    // Get current cluster name and export kubeconfig
+                    // Set up kubeconfig from the provided file
                     sh '''
-                        echo "Getting current kind cluster..."
-                        CURRENT_CLUSTER=$(kind get clusters | head -n 1)
-                        echo "Current cluster: $CURRENT_CLUSTER"
+                        echo "Setting up kubeconfig for Jenkins..."
                         
-                        if [ -z "$CURRENT_CLUSTER" ]; then
-                            echo "ERR! No kind cluster found. Please ensure Devpets-main is deployed first."
-                            exit 1
-                        fi
+                        # Create .kube directory if it doesn't exist
+                        mkdir -p ~/.kube
                         
-                        echo "Exporting kubeconfig for cluster: $CURRENT_CLUSTER"
-                        kind export kubeconfig --name $CURRENT_CLUSTER
-                        echo "OK! Kubeconfig exported"
+                        # Copy the kubeconfig file
+                        cp jenkins-kubeconfig ~/.kube/config
                         
-                        # Verify cluster connection
+                        # Set proper permissions
+                        chmod 600 ~/.kube/config
+                        
+                        echo "Kubeconfig set up successfully"
+                        
+                        # Test cluster connection
+                        echo "Testing cluster connection..."
                         kubectl cluster-info
                         kubectl get nodes
                         
@@ -55,36 +51,14 @@ pipeline {
                             echo "Creating devops-pets namespace..."
                             kubectl create namespace devops-pets
                         fi
-                    '''
-                }
-            }
-        }
-
-        stage('Setup Docker Registry') {
-            steps {
-                script {
-                    echo "========================================"
-                    echo "STEP 2: SETTING UP DOCKER REGISTRY"
-                    echo "========================================"
-                    
-                    // Start local Docker registry if not running
-                    sh '''
-                        if ! docker ps | grep -q docker-registry; then
-                            echo "Starting local Docker registry..."
-                            docker run -d \
-                              --name docker-registry \
-                              --restart=always \
-                              -p 5000:5000 \
-                              -v registry-data:/var/lib/registry \
-                              registry:2
-                            echo "OK! Docker registry started"
-                        else
-                            echo "OK! Docker registry already running"
-                        fi
                         
-                        # Wait for registry to be ready
-                        sleep 5
-                        curl -s http://localhost:5000/v2/_catalog || echo "Registry not ready yet, will be available soon"
+                        # Show current context
+                        echo "Current kubeconfig context:"
+                        kubectl config current-context
+                        
+                        # Show cluster info
+                        echo "Cluster information:"
+                        kubectl config view --minify
                     '''
                 }
             }
@@ -94,7 +68,7 @@ pipeline {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 3: COMPLETE CLEANUP"
+                    echo "STEP 2: COMPLETE CLEANUP"
                     echo "========================================"
                     
                     // Stop all port forwarding
@@ -120,12 +94,6 @@ pipeline {
                         echo "Waiting for resources to be deleted..."
                         sleep 10
                     '''
-                    
-                    // Clean up old Docker images
-                    sh '''
-                        echo "Cleaning old Docker images..."
-                        docker images | grep devops-pets | tail -n +6 | awk '{print $3}' | xargs -r docker rmi -f || true
-                    '''
                 }
             }
         }
@@ -147,61 +115,31 @@ pipeline {
             }
         }
 
-        stage('Build and Push Docker Images') {
+        stage('Prepare Files for Deployment') {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 4: BUILDING AND PUSHING DOCKER IMAGES"
+                    echo "STEP 3: PREPARING FILES FOR DEPLOYMENT"
                     echo "========================================"
                     
-                    // Build backend image
+                    // Copy JAR file to target directory
                     dir('Ask') {
-                        sh """
-                            echo "Building backend image: ${DOCKER_REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG}"
-                            docker build -t ${DOCKER_REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG} .
-                            docker tag ${DOCKER_REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${BACKEND_IMAGE}:latest
-                            echo "OK! Backend image built"
-                        """
+                        sh '''
+                            echo "Preparing backend JAR file..."
+                            ls -la target/
+                            cp target/*.jar target/app.jar
+                            echo "OK! Backend JAR prepared"
+                        '''
                     }
                     
-                    // Build frontend image
+                    // Verify frontend build
                     dir('frontend') {
-                        sh """
-                            echo "Building frontend image: ${DOCKER_REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG}"
-                            docker build -t ${DOCKER_REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG} .
-                            docker tag ${DOCKER_REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${FRONTEND_IMAGE}:latest
-                            echo "OK! Frontend image built"
-                        """
+                        sh '''
+                            echo "Verifying frontend build..."
+                            ls -la dist/
+                            echo "OK! Frontend build verified"
+                        '''
                     }
-                    
-                    // Push images to registry
-                    sh """
-                        echo "Pushing images to registry..."
-                        docker push ${DOCKER_REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${BACKEND_IMAGE}:latest
-                        docker push ${DOCKER_REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${FRONTEND_IMAGE}:latest
-                        echo "OK! Images pushed successfully"
-                    """
-                }
-            }
-        }
-
-        stage('Load Images to Cluster') {
-            steps {
-                script {
-                    echo "========================================"
-                    echo "STEP 5: LOADING IMAGES TO CLUSTER"
-                    echo "========================================"
-                    
-                    // Get current cluster name and load images
-                    sh '''
-                        CURRENT_CLUSTER=$(kind get clusters | head -n 1)
-                        echo "Loading images into kind cluster: $CURRENT_CLUSTER"
-                        kind load docker-image ${DOCKER_REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG} --name $CURRENT_CLUSTER
-                        kind load docker-image ${DOCKER_REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG} --name $CURRENT_CLUSTER
-                        echo "OK! Images loaded successfully"
-                    '''
                 }
             }
         }
@@ -210,20 +148,94 @@ pipeline {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 6: UPDATING KUBERNETES MANIFESTS"
+                    echo "STEP 4: UPDATING KUBERNETES MANIFESTS"
                     echo "========================================"
                     
-                    // Update backend deployment with new image
-                    sh """
-                        echo "Updating backend deployment with image: ${DOCKER_REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG}"
-                        sed -i 's|image: .*|image: ${DOCKER_REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG}|g' k8s/backend/backend-deployment.yaml
-                    """
+                    // Update backend deployment to use hostPath
+                    sh '''
+                        echo "Updating backend deployment for hostPath..."
+                        cat > k8s/backend/backend-deployment.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: openjdk:17-jdk-slim
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres.default.svc.cluster.local:5432/petdb
+            - name: SPRING_DATASOURCE_USERNAME
+              value: petuser
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: petpass
+            - name: SPRING_MAIL_HOST
+              value: mailhog
+            - name: SPRING_MAIL_PORT
+              value: "1025"
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+              value: http://localhost:8083/realms/petsystem
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES
+              value: backend
+          command: ["java", "-jar", "/app/app.jar"]
+          volumeMounts:
+            - name: app-jar
+              mountPath: /app
+      volumes:
+        - name: app-jar
+          hostPath:
+            path: /var/jenkins_home/jobs/Devpets/workspace/Ask/target
+            type: Directory
+EOF
+                    '''
                     
-                    // Update frontend deployment with new image
-                    sh """
-                        echo "Updating frontend deployment with image: ${DOCKER_REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG}"
-                        sed -i 's|image: .*|image: ${DOCKER_REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG}|g' k8s/frontend/frontend-deployment.yaml
-                    """
+                    // Update frontend deployment to use hostPath
+                    sh '''
+                        echo "Updating frontend deployment for hostPath..."
+                        cat > k8s/frontend/frontend-deployment.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: nginx:stable-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: frontend-files
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: frontend-files
+          hostPath:
+            path: /var/jenkins_home/jobs/Devpets/workspace/frontend/dist
+            type: Directory
+EOF
+                    '''
                 }
             }
         }
@@ -232,7 +244,7 @@ pipeline {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 7: DEPLOYING TO KUBERNETES"
+                    echo "STEP 5: DEPLOYING TO KUBERNETES"
                     echo "========================================"
                     
                     // Apply all Kubernetes resources
@@ -262,7 +274,7 @@ pipeline {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 8: SETTING UP PORT FORWARDING"
+                    echo "STEP 6: SETTING UP PORT FORWARDING"
                     echo "========================================"
                     
                     // Kill any existing port forwards
@@ -322,7 +334,7 @@ pipeline {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 9: VERIFYING DEPLOYMENT"
+                    echo "STEP 7: VERIFYING DEPLOYMENT"
                     echo "========================================"
                     
                     // Verify all pods are running
@@ -342,7 +354,7 @@ pipeline {
                         kubectl get services -n ${NAMESPACE}
                         
                         echo "=== Infrastructure Services (from Devpets-main) ==="
-                        kubectl get services -n devops-pets | grep -E "(postgres|mailhog|jenkins)"
+                        kubectl get services -n devops-pets | grep -E "(postgres|mailhog|jenkins)" || echo "No infrastructure services found"
                     '''
                     
                     // Final verification that all deployments are ready
@@ -368,16 +380,15 @@ pipeline {
             ========================================
             DEPLOYMENT SUCCESSFUL!
             ========================================
-            Fresh images have been built and deployed:
-            - Backend: localhost:5000/devops-pets-backend:BUILD_NUMBER
-            - Frontend: localhost:5000/devops-pets-frontend:BUILD_NUMBER
+            Applications have been built and deployed:
+            - Backend: Spring Boot JAR deployed
+            - Frontend: Vue.js build deployed
             
             Access Points:
             - Backend API: http://localhost:30080
             - Frontend App: http://localhost:30000
             - MailHog UI: http://localhost:8025
             - PostgreSQL: localhost:5432
-            - Docker Registry: http://localhost:5000
             
             ========================================
             PORT FORWARDING STATUS
@@ -397,13 +408,6 @@ pipeline {
         }
         failure {
             echo 'Deployment failed! Check the logs for more details.'
-        }
-        cleanup {
-            // Clean up old images (keep last 5 builds)
-            sh '''
-                echo "Cleaning up old Docker images..."
-                docker images | grep devops-pets | tail -n +6 | awk '{print $3}' | xargs -r docker rmi -f || true
-            '''
         }
     }
 }

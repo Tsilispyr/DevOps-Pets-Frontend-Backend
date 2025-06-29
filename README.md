@@ -1,191 +1,125 @@
-# DevOps Pets - Frontend & Backend
+# DevPets Application
 
-A complete DevOps project with frontend (Vue.js) and backend (Spring Boot) applications, deployed using Jenkins pipeline to Kubernetes.
+A full-stack pet adoption management system with Spring Boot backend and Vue.js frontend.
 
-## Project Structure
+## Architecture
 
-```
-F-B-END/
-├── Ask/                    # Spring Boot Backend Application
-├── frontend/              # Vue.js Frontend Application
-├── k8s/                   # Kubernetes Manifests
-├── Jenkinsfile           # Jenkins Pipeline
-├── JENKINS_SETUP.md      # Setup Instructions
-└── README.md             # This file
-```
+This project contains:
+- **Backend**: Spring Boot application with JWT authentication
+- **Frontend**: Vue.js application with modern UI
+- **Infrastructure**: Kubernetes deployment with hostPath volumes
 
-## Applications
+## Prerequisites
 
-### Backend (Spring Boot)
-- **Technology**: Spring Boot 3.3.8, Java 17
-- **Database**: PostgreSQL
-- **Features**: REST API, JWT Authentication, Email Service
-- **Port**: 30080 (NodePort)
+- Jenkins (deployed via Devpets-main)
+- Kubernetes cluster (kind) with namespace `devops-pets`
+- PostgreSQL and MailHog (deployed via Devpets-main)
+- kubectl configured to access the cluster
 
-### Frontend (Vue.js)
-- **Technology**: Vue 3, Vite, Pinia
-- **Features**: Modern SPA, State Management, Router
-- **Port**: 30000 (NodePort)
+## Cluster Connection
 
-## Infrastructure
+### How Jenkins Connects to the Local Cluster
 
-### Services (from Devpets-main)
-- **PostgreSQL**: localhost:5432
+The Jenkins pipeline connects to the local Kubernetes cluster using the `jenkins-kubeconfig` file:
+
+1. **Kubeconfig Setup**: The pipeline copies `jenkins-kubeconfig` to `~/.kube/config`
+2. **Cluster Authentication**: Uses the provided service account token for authentication
+3. **Namespace Management**: Creates or verifies the `devops-pets` namespace exists
+4. **Cluster Verification**: Tests the connection with `kubectl cluster-info`
+
+### Kubeconfig Details
+
+The `jenkins-kubeconfig` file contains:
+- **Cluster Server**: `https://127.0.0.1:6445` (kind cluster API server)
+- **Authentication**: Service account token for `jenkins-admin`
+- **Context**: `kind-devops-pets`
+- **Security**: `insecure-skip-tls-verify: true` for local development
+
+## Deployment
+
+The application is deployed via Jenkins pipeline that:
+
+1. **Sets up kubeconfig** for cluster access
+2. **Builds** the Spring Boot JAR and Vue.js dist files
+3. **Deploys** to Kubernetes using hostPath volumes
+4. **Sets up** port forwarding for local access
+5. **Verifies** deployment status
+
+### Access Points
+
+After successful deployment:
+- **Frontend**: http://localhost:30000
+- **Backend API**: http://localhost:30080
 - **MailHog UI**: http://localhost:8025
-- **MailHog SMTP**: localhost:1025
-- **Jenkins**: http://localhost:8082
-
-### Docker Registry
-- **Registry**: http://localhost:5000
-
-## Quick Start
-
-### Prerequisites
-- Java 17+
-- Node.js 18+
-- Docker
-- kubectl
-- kind
-- Maven 3.9.5+
-
-### Setup Steps
-
-1. **Start Devpets-main Infrastructure**
-   ```bash
-   cd ../Devpets-main
-   ./start-port-forwards.sh
-   ```
-
-2. **Run Jenkins Pipeline**
-   - Go to Jenkins UI: http://localhost:8082
-   - Create new pipeline job
-   - Point to this repository
-   - Run the pipeline
-
-3. **Access Applications**
-   - Backend API: http://localhost:30080
-   - Frontend App: http://localhost:30000
-   - MailHog UI: http://localhost:8025
-
-## Jenkins Pipeline
-
-The pipeline automatically:
-- Sets up Docker registry
-- Builds applications
-- Creates Docker images
-- Deploys to Kubernetes
-- Sets up port forwarding
-- Verifies deployment
+- **PostgreSQL**: localhost:5432
 
 ### Pipeline Stages
-1. Setup Docker Registry
-2. Complete Cleanup
-3. Build Applications
-4. Build & Push Images
-5. Load to Cluster
-6. Update Manifests
-7. Deploy to Kubernetes
-8. Setup Port Forwarding
-9. Verify Deployment
+
+1. **Setup Kubeconfig** - Configures cluster access
+2. **Complete Cleanup** - Removes old deployments and port forwards
+3. **Build Java Application** - Compiles Spring Boot JAR
+4. **Build Frontend** - Builds Vue.js application
+5. **Prepare Files** - Prepares files for deployment
+6. **Update Manifests** - Updates Kubernetes manifests with hostPath volumes
+7. **Deploy to Kubernetes** - Applies manifests and waits for readiness
+8. **Setup Port Forwarding** - Establishes port forwards for local access
+9. **Verify Deployment** - Confirms all services are running
 
 ## Development
 
-### Backend Development
-```bash
-cd Ask
-mvn spring-boot:run
-```
+### Backend (Spring Boot)
+- Java 17
+- Spring Boot 3.x
+- JWT Authentication
+- PostgreSQL database
+- MailHog for email testing
 
-### Frontend Development
-```bash
-cd frontend
-npm install
-npm run dev
-```
+### Frontend (Vue.js)
+- Vue 3 with Composition API
+- Vite build tool
+- Modern responsive UI
+- JWT token management
 
-### Database
-The backend connects to PostgreSQL running in the Devpets-main cluster:
-- Host: postgres.default.svc.cluster.local
-- Database: petdb
-- Username: petuser
-- Password: petpass
+## Infrastructure
 
-### Email Service
-Uses MailHog for email testing:
-- SMTP Host: mailhog
-- SMTP Port: 1025
-- Web UI: http://localhost:8025
-
-## Configuration
-
-### Environment Variables
-- `SPRING_DATASOURCE_URL`: jdbc:postgresql://postgres:5432/petdb
-- `SPRING_MAIL_HOST`: mailhog
-- `SPRING_MAIL_PORT`: 1025
-
-### Kubernetes Configuration
-- Namespace: devops-pets
-- Cluster: devops-pets (kind)
-- Image Registry: localhost:5000
+The application runs in the `devops-pets` namespace alongside:
+- PostgreSQL database
+- MailHog email service
+- Jenkins CI/CD
 
 ## Troubleshooting
 
 ### Common Issues
-1. **Port forwarding not working**: Check if services are deployed
-2. **Database connection errors**: Verify PostgreSQL is running
-3. **Image pull errors**: Check Docker registry
-4. **Build failures**: Verify tool versions
+
+1. **Port forwarding fails**: Check if ports 30000/30080 are available
+2. **Database connection fails**: Verify PostgreSQL is running in the cluster
+3. **Build failures**: Ensure Maven and Node.js are available in Jenkins
+4. **Cluster connection fails**: Verify the kubeconfig file is correct and cluster is running
 
 ### Useful Commands
+
 ```bash
-# Check cluster status
+# Check deployment status
 kubectl get all -n devops-pets
 
 # View logs
 kubectl logs -n devops-pets <pod-name>
 
-# Check port forwarding
-netstat -tlnp | grep -E "(30080|30000)"
-
 # Stop port forwarding
 pkill -f 'kubectl port-forward'
+
+# Check infrastructure services
+kubectl get services -n devops-pets
+
+# Test cluster connection
+kubectl cluster-info
+kubectl get nodes
 ```
-
-## Architecture
-
-### Frontend
-- Vue 3 with Composition API
-- Pinia for state management
-- Vue Router for navigation
-- Axios for API calls
-- Vite for build tooling
-
-### Backend
-- Spring Boot 3.3.8
-- Spring Security with JWT
-- Spring Data JPA
-- PostgreSQL database
-- MailHog for email testing
-
-### Infrastructure
-- Kubernetes (kind) for orchestration
-- Docker for containerization
-- Jenkins for CI/CD
-- Local Docker registry
-- NodePort services for external access
-
-## Contributing
-
-1. Make changes to frontend or backend
-2. Commit to any branch
-3. Run Jenkins pipeline
-4. Verify deployment
-5. Test functionality
 
 ## Notes
 
-- All services run in devops-pets namespace
-- Images are tagged with BUILD_NUMBER
-- Old images are automatically cleaned
-- Port forwarding is managed by pipeline
-- No manual setup required after initial configuration
+- The pipeline uses hostPath volumes to mount built files directly
+- No Docker registry is required - uses standard images (openjdk, nginx)
+- Port forwarding is managed by the Jenkins pipeline
+- All infrastructure services are provided by Devpets-main deployment
+- Cluster connection is established via kubeconfig file with service account token

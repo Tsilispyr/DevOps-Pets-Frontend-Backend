@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: backend
-          image: localhost:5000/devops-pets-backend:latest
-          imagePullPolicy: Always
+          image: openjdk:17-jdk-slim
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           env:
