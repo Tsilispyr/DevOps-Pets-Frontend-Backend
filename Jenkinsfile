@@ -175,80 +175,32 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 4: BUILDING AND PUSHING DOCKER IMAGES"
+                    echo "STEP 4: PREPARING DEPLOYMENT FILES"
                     echo "========================================"
                     
-                    // Create simple backend image using kubectl
+                    // Prepare backend files
                     dir('Ask') {
                         sh '''
-                            echo "Creating backend image..."
-                            
-                            # Create a ConfigMap with the JAR file (smaller than full directory)
-                            kubectl create configmap backend-jar --from-file=target/app.jar -n ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-                            
-                            # Create a pod that extracts the JAR and creates a simple image
-                            cat > backend-image-builder.yaml << 'EOF'
-apiVersion: v1
-kind: Pod
-metadata:
-  name: backend-image-builder
-spec:
-  containers:
-  - name: image-builder
-    image: busybox:latest
-    command: ['sh', '-c', 'echo "Backend image ready" && exit 0']
-    volumeMounts:
-    - name: jar-volume
-      mountPath: /app
-  volumes:
-  - name: jar-volume
-    configMap:
-      name: backend-jar
-  restartPolicy: Never
-EOF
-                            
-                            kubectl apply -f backend-image-builder.yaml -n ${NAMESPACE}
-                            kubectl wait --for=condition=ready pod/backend-image-builder -n ${NAMESPACE} --timeout=60s
-                            echo "OK! Backend image prepared"
+                            echo "Preparing backend files..."
+                            ls -la target/
+                            echo "Backend JAR size:"
+                            ls -lh target/app.jar
+                            echo "OK! Backend files prepared"
                         '''
                     }
                     
-                    // Create simple frontend image using kubectl
+                    // Prepare frontend files
                     dir('frontend') {
                         sh '''
-                            echo "Creating frontend image..."
-                            
-                            # Create a ConfigMap with the dist files
-                            kubectl create configmap frontend-files --from-file=dist/ -n ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-                            
-                            # Create a pod that extracts the files and creates a simple image
-                            cat > frontend-image-builder.yaml << 'EOF'
-apiVersion: v1
-kind: Pod
-metadata:
-  name: frontend-image-builder
-spec:
-  containers:
-  - name: image-builder
-    image: busybox:latest
-    command: ['sh', '-c', 'echo "Frontend image ready" && exit 0']
-    volumeMounts:
-    - name: files-volume
-      mountPath: /app
-  volumes:
-  - name: files-volume
-    configMap:
-      name: frontend-files
-  restartPolicy: Never
-EOF
-                            
-                            kubectl apply -f frontend-image-builder.yaml -n ${NAMESPACE}
-                            kubectl wait --for=condition=ready pod/frontend-image-builder -n ${NAMESPACE} --timeout=60s
-                            echo "OK! Frontend image prepared"
+                            echo "Preparing frontend files..."
+                            ls -la dist/
+                            echo "Frontend files size:"
+                            du -sh dist/
+                            echo "OK! Frontend files prepared"
                         '''
                     }
                     
-                    echo "OK! Images prepared successfully"
+                    echo "OK! All files prepared successfully"
                 }
             }
         }
@@ -260,9 +212,9 @@ EOF
                     echo "STEP 5: UPDATING KUBERNETES MANIFESTS"
                     echo "========================================"
                     
-                    // Update backend deployment to use ConfigMap
+                    // Update backend deployment to use init container with file copy
                     sh '''
-                        echo "Updating backend deployment for ConfigMap..."
+                        echo "Updating backend deployment for init container..."
                         cat > k8s/backend/backend-deployment.yaml << 'EOF'
 apiVersion: apps/v1
 kind: Deployment
@@ -278,6 +230,13 @@ spec:
       labels:
         app: backend
     spec:
+      initContainers:
+        - name: copy-jar
+          image: busybox:latest
+          command: ['sh', '-c', 'echo "Backend JAR will be copied during deployment" && exit 0']
+          volumeMounts:
+            - name: app-jar
+              mountPath: /app
       containers:
         - name: backend
           image: openjdk:17-jdk-slim
@@ -305,14 +264,13 @@ spec:
               mountPath: /app
       volumes:
         - name: app-jar
-          configMap:
-            name: backend-jar
+          emptyDir: {}
 EOF
                     '''
                     
-                    // Update frontend deployment to use ConfigMap
+                    // Update frontend deployment to use init container with file copy
                     sh '''
-                        echo "Updating frontend deployment for ConfigMap..."
+                        echo "Updating frontend deployment for init container..."
                         cat > k8s/frontend/frontend-deployment.yaml << 'EOF'
 apiVersion: apps/v1
 kind: Deployment
@@ -328,6 +286,13 @@ spec:
       labels:
         app: frontend
     spec:
+      initContainers:
+        - name: copy-files
+          image: busybox:latest
+          command: ['sh', '-c', 'echo "Frontend files will be copied during deployment" && exit 0']
+          volumeMounts:
+            - name: frontend-files
+              mountPath: /app
       containers:
         - name: frontend
           image: nginx:stable-alpine
@@ -339,8 +304,7 @@ spec:
               mountPath: /usr/share/nginx/html
       volumes:
         - name: frontend-files
-          configMap:
-            name: frontend-files
+          emptyDir: {}
 EOF
                     '''
                 }
@@ -361,17 +325,50 @@ EOF
                         echo "OK! Resources applied"
                     '''
                     
-                    // Wait for deployments to be ready
+                    // Wait for pods to be ready
                     sh '''
-                        echo "Waiting for deployments to be ready..."
+                        echo "Waiting for pods to be ready..."
                         
-                        echo "Waiting for backend deployment..."
-                        kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/backend -n ${NAMESPACE}
-                        echo "OK! Backend deployment is ready"
+                        echo "Waiting for backend pod..."
+                        kubectl wait --for=condition=ready pod -l app=backend -n ${NAMESPACE} --timeout=${TIMEOUT}
+                        echo "OK! Backend pod is ready"
                         
-                        echo "Waiting for frontend deployment..."
-                        kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/frontend -n ${NAMESPACE}
-                        echo "OK! Frontend deployment is ready"
+                        echo "Waiting for frontend pod..."
+                        kubectl wait --for=condition=ready pod -l app=frontend -n ${NAMESPACE} --timeout=${TIMEOUT}
+                        echo "OK! Frontend pod is ready"
+                    '''
+                    
+                    // Copy files to pods
+                    sh '''
+                        echo "Copying files to pods..."
+                        
+                        # Get pod names
+                        BACKEND_POD=$(kubectl get pods -l app=backend -n ${NAMESPACE} -o jsonpath='{.items[0].metadata.name}')
+                        FRONTEND_POD=$(kubectl get pods -l app=frontend -n ${NAMESPACE} -o jsonpath='{.items[0].metadata.name}')
+                        
+                        echo "Backend pod: $BACKEND_POD"
+                        echo "Frontend pod: $FRONTEND_POD"
+                        
+                        # Copy JAR to backend pod
+                        echo "Copying JAR to backend pod..."
+                        kubectl cp Ask/target/app.jar ${NAMESPACE}/$BACKEND_POD:/app/app.jar
+                        echo "OK! JAR copied to backend pod"
+                        
+                        # Copy dist files to frontend pod
+                        echo "Copying dist files to frontend pod..."
+                        kubectl cp frontend/dist/ ${NAMESPACE}/$FRONTEND_POD:/usr/share/nginx/html/
+                        echo "OK! Dist files copied to frontend pod"
+                        
+                        # Restart pods to pick up new files
+                        echo "Restarting pods to pick up new files..."
+                        kubectl delete pod $BACKEND_POD -n ${NAMESPACE}
+                        kubectl delete pod $FRONTEND_POD -n ${NAMESPACE}
+                        
+                        # Wait for new pods to be ready
+                        echo "Waiting for new pods to be ready..."
+                        kubectl wait --for=condition=ready pod -l app=backend -n ${NAMESPACE} --timeout=${TIMEOUT}
+                        kubectl wait --for=condition=ready pod -l app=frontend -n ${NAMESPACE} --timeout=${TIMEOUT}
+                        echo "OK! All pods are ready with new files"
                     '''
                 }
             }
