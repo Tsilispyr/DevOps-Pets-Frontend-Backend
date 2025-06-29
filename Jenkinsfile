@@ -24,42 +24,39 @@ pipeline {
                     echo "STEP 1: SETTING UP KUBECONFIG"
                     echo "========================================"
                     
-                    // Set up kubeconfig with fresh token
+                    // Set up kubeconfig using default service account
                     sh '''
                         echo "Setting up kubeconfig for Jenkins..."
                         
                         # Create .kube directory if it doesn't exist
                         mkdir -p ~/.kube
                         
-                        # Create a fresh service account token
-                        echo "Creating fresh service account token..."
+                        # Get the default service account token
+                        echo "Getting default service account token..."
                         
-                        # Create service account if it doesn't exist
-                        kubectl create serviceaccount jenkins-admin -n kube-system --dry-run=client -o yaml | kubectl apply -f -
+                        # Get the token from the default service account
+                        TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
                         
-                        # Create cluster role binding if it doesn't exist
-                        kubectl create clusterrolebinding jenkins-admin --clusterrole=cluster-admin --serviceaccount=kube-system:jenkins-admin --dry-run=client -o yaml | kubectl apply -f -
+                        # Get the CA certificate
+                        CA_CERT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt | base64 -w 0)
                         
-                        # Get the fresh token
-                        TOKEN=$(kubectl create token jenkins-admin -n kube-system)
-                        
-                        # Create kubeconfig with fresh token
+                        # Create kubeconfig with default service account
                         cat > ~/.kube/config << EOF
 apiVersion: v1
 kind: Config
 clusters:
 - cluster:
     server: https://kubernetes.default.svc
-    insecure-skip-tls-verify: true
+    certificate-authority-data: $CA_CERT
   name: devops-pets
 contexts:
 - context:
     cluster: devops-pets
-    user: jenkins-admin
+    user: jenkins-default
   name: kind-devops-pets
 current-context: kind-devops-pets
 users:
-- name: jenkins-admin
+- name: jenkins-default
   user:
     token: $TOKEN
 EOF
@@ -67,7 +64,7 @@ EOF
                         # Set proper permissions
                         chmod 600 ~/.kube/config
                         
-                        echo "Kubeconfig set up successfully with fresh token"
+                        echo "Kubeconfig set up successfully with default service account"
                         
                         # Test cluster connection
                         echo "Testing cluster connection..."
@@ -181,9 +178,9 @@ EOF
                     echo "STEP 4: UPDATING KUBERNETES MANIFESTS"
                     echo "========================================"
                     
-                    // Update backend deployment to use hostPath
+                    // Update backend deployment to use emptyDir and copy JAR
                     sh '''
-                        echo "Updating backend deployment for hostPath..."
+                        echo "Updating backend deployment for emptyDir..."
                         cat > k8s/backend/backend-deployment.yaml << 'EOF'
 apiVersion: apps/v1
 kind: Deployment
@@ -199,6 +196,15 @@ spec:
       labels:
         app: backend
     spec:
+      initContainers:
+        - name: copy-jar
+          image: busybox:latest
+          command: ['sh', '-c', 'cp /source/app.jar /app/app.jar']
+          volumeMounts:
+            - name: source-jar
+              mountPath: /source
+            - name: app-jar
+              mountPath: /app
       containers:
         - name: backend
           image: openjdk:17-jdk-slim
@@ -225,16 +231,17 @@ spec:
             - name: app-jar
               mountPath: /app
       volumes:
+        - name: source-jar
+          configMap:
+            name: backend-jar
         - name: app-jar
-          hostPath:
-            path: /var/jenkins_home/jobs/Devpets/workspace/Ask/target
-            type: Directory
+          emptyDir: {}
 EOF
                     '''
                     
-                    // Update frontend deployment to use hostPath
+                    // Update frontend deployment to use emptyDir and copy dist files
                     sh '''
-                        echo "Updating frontend deployment for hostPath..."
+                        echo "Updating frontend deployment for emptyDir..."
                         cat > k8s/frontend/frontend-deployment.yaml << 'EOF'
 apiVersion: apps/v1
 kind: Deployment
@@ -250,6 +257,15 @@ spec:
       labels:
         app: frontend
     spec:
+      initContainers:
+        - name: copy-files
+          image: busybox:latest
+          command: ['sh', '-c', 'cp -r /source/* /app/']
+          volumeMounts:
+            - name: source-files
+              mountPath: /source
+            - name: frontend-files
+              mountPath: /app
       containers:
         - name: frontend
           image: nginx:stable-alpine
@@ -260,11 +276,36 @@ spec:
             - name: frontend-files
               mountPath: /usr/share/nginx/html
       volumes:
+        - name: source-files
+          configMap:
+            name: frontend-files
         - name: frontend-files
-          hostPath:
-            path: /var/jenkins_home/jobs/Devpets/workspace/frontend/dist
-            type: Directory
+          emptyDir: {}
 EOF
+                    '''
+                }
+            }
+        }
+
+        stage('Create ConfigMaps') {
+            steps {
+                script {
+                    echo "========================================"
+                    echo "STEP 5: CREATING CONFIGMAPS"
+                    echo "========================================"
+                    
+                    // Create ConfigMap for backend JAR
+                    sh '''
+                        echo "Creating ConfigMap for backend JAR..."
+                        kubectl create configmap backend-jar --from-file=app.jar=Ask/target/app.jar -n ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                        echo "OK! Backend JAR ConfigMap created"
+                    '''
+                    
+                    // Create ConfigMap for frontend files
+                    sh '''
+                        echo "Creating ConfigMap for frontend files..."
+                        kubectl create configmap frontend-files --from-file=frontend/dist/ -n ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                        echo "OK! Frontend files ConfigMap created"
                     '''
                 }
             }
@@ -274,7 +315,7 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 5: DEPLOYING TO KUBERNETES"
+                    echo "STEP 6: DEPLOYING TO KUBERNETES"
                     echo "========================================"
                     
                     // Apply all Kubernetes resources
@@ -304,7 +345,7 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 6: SETTING UP PORT FORWARDING"
+                    echo "STEP 7: SETTING UP PORT FORWARDING"
                     echo "========================================"
                     
                     // Kill any existing port forwards
@@ -364,7 +405,7 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 7: VERIFYING DEPLOYMENT"
+                    echo "STEP 8: VERIFYING DEPLOYMENT"
                     echo "========================================"
                     
                     // Verify all pods are running
