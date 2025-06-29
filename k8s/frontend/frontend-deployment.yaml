@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: devops-pets-frontend:latest
-          imagePullPolicy: IfNotPresent
+          image: localhost:5000/devops-pets-frontend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 80

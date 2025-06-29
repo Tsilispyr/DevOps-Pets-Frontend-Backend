@@ -1,7 +1,7 @@
 # Jenkins Pipeline Setup Guide
 
 ## Overview
-This Jenkins pipeline builds and deploys the frontend and backend applications using system tools from localhost.
+This Jenkins pipeline builds and deploys the frontend and backend applications with fresh Docker images every time. It uses a local Docker registry and ensures clean deployments by removing old resources before deploying new ones.
 
 ## Prerequisites
 
@@ -10,13 +10,18 @@ This Jenkins pipeline builds and deploys the frontend and backend applications u
 - **Maven 3.9.5+** - for Java build
 - **Node.js 18+** - for frontend build
 - **npm** - comes with Node.js
-- **Docker** - for containerization
+- **Docker** - for building and pushing images
 - **kubectl** - for Kubernetes deployment
 
 ### Check Tools Availability:
 ```bash
-chmod +x check-tools.sh
-./check-tools.sh
+# Check if tools are available
+java -version
+mvn -version
+node --version
+npm --version
+docker --version
+kubectl version --client
 ```
 
 ## Setup Steps
@@ -63,7 +68,16 @@ sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 # Download from: https://kubernetes.io/docs/tasks/tools/install-kubectl/
 ```
 
-### 2. Jenkins Configuration
+### 2. Setup Local Docker Registry
+
+```bash
+chmod +x setup-docker-registry.sh
+./setup-docker-registry.sh
+```
+
+This will start a local Docker registry on `localhost:5000` where images will be stored.
+
+### 3. Jenkins Configuration
 
 #### Required Jenkins Credentials:
 - **jenkins-kubeconfig-text** - Kubernetes config file content
@@ -71,7 +85,7 @@ sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 #### Jenkins Tools:
 - **Maven 3.9.5** - should be configured in Jenkins
 
-### 3. Start Devpets-main Services
+### 4. Start Devpets-main Services
 
 Before running the pipeline, ensure the Devpets-main services are running:
 
@@ -88,10 +102,24 @@ This will start port forwarding for:
 ## Pipeline Stages
 
 1. **Checkout** - Clone the repository
-2. **Build Java Application** - Compile backend with Maven
-3. **Build Frontend** - Build Vue.js application with npm
-4. **Build Docker Images** - Create container images
-5. **Deploy to Kubernetes** - Deploy to cluster (main branch only)
+2. **Clean Kubernetes Resources** - Remove existing deployments and services
+3. **Build Java Application** - Compile backend with Maven
+4. **Build Frontend** - Build Vue.js application with npm
+5. **Build and Push Docker Images** - Create fresh images and push to registry
+6. **Update Kubernetes Manifests** - Update image tags in deployment files
+7. **Deploy to Kubernetes** - Deploy fresh images to cluster
+8. **Verify Deployment** - Check deployment status
+
+## Deployment Method
+
+The pipeline ensures fresh deployments every time:
+
+- **Cleans existing resources** before deployment
+- **Builds fresh Docker images** with unique tags (BUILD_NUMBER)
+- **Pushes to local registry** (localhost:5000)
+- **Updates manifests** with new image tags
+- **Deploys fresh images** to Kubernetes
+- **Cleans old images** after successful deployment
 
 ## Access Points
 
@@ -100,15 +128,25 @@ After successful deployment:
 - **Frontend App**: http://localhost:30000
 - **MailHog UI**: http://localhost:8025
 - **PostgreSQL**: localhost:5432
+- **Docker Registry**: http://localhost:5000
+
+## Manual Cleanup
+
+If you need to manually clean the cluster:
+
+```bash
+chmod +x clean-cluster.sh
+./clean-cluster.sh
+```
 
 ## Troubleshooting
 
 ### Common Issues:
 
-1. **Java version error**: Ensure Java 17+ is installed and in PATH
-2. **Node.js not found**: Install Node.js 18+ and ensure it's in PATH
-3. **Docker permission error**: Add user to docker group or run with sudo
-4. **kubectl connection error**: Check kubeconfig and cluster status
+1. **Docker registry not accessible**: Ensure Docker registry is running on localhost:5000
+2. **Image pull errors**: Check if images were pushed successfully to registry
+3. **Kubernetes connection errors**: Verify kubeconfig and cluster status
+4. **Build failures**: Check Java/Node.js versions and dependencies
 
 ### Check Pipeline Logs:
 - Go to Jenkins job → Console Output
@@ -117,7 +155,8 @@ After successful deployment:
 
 ## Notes
 
-- The pipeline uses system tools instead of Jenkins-managed tools for simplicity
-- All tools must be available in the Jenkins agent's PATH
-- The pipeline only deploys from the 'main' branch
-- Docker images are built locally and must be accessible to the Kubernetes cluster 
+- Each build creates fresh images with unique tags
+- Old deployments are automatically cleaned before new deployment
+- Docker registry stores images locally for faster access
+- Pipeline only deploys from the 'main' branch
+- Automatic cleanup of old Docker images (keeps last 5 builds) 

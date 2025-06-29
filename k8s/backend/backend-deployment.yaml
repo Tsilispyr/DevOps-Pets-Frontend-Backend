@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: backend
-          image: devops-pets-backend:latest
-          imagePullPolicy: IfNotPresent
+          image: localhost:5000/devops-pets-backend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           env:
@@ -33,3 +33,12 @@ spec:
               value: http://localhost:8083/realms/petsystem
             - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES
               value: backend
+          command: ["java", "-jar", "/app/app.jar"]
+          volumeMounts:
+            - name: app-jar
+              mountPath: /app
+      volumes:
+        - name: app-jar
+          hostPath:
+            path: /var/jenkins_home/jobs/Devpets/workspace/Ask/target
+            type: Directory
