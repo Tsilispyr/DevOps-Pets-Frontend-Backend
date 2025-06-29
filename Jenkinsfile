@@ -353,20 +353,20 @@ EOF
                         echo "OK! Resources applied"
                     '''
                     
-                    // Wait for pods to be ready
+                    // Wait for pods to be created (not necessarily ready)
                     sh '''
-                        echo "Waiting for pods to be ready..."
+                        echo "Waiting for pods to be created..."
                         
-                        echo "Waiting for backend pod..."
-                        kubectl wait --for=condition=ready pod -l app=backend -n ${NAMESPACE} --timeout=${TIMEOUT}
-                        echo "OK! Backend pod is ready"
+                        echo "Waiting for backend pod to be created..."
+                        kubectl wait --for=condition=podScheduled pod -l app=backend -n ${NAMESPACE} --timeout=${TIMEOUT}
+                        echo "OK! Backend pod is created"
                         
-                        echo "Waiting for frontend pod..."
-                        kubectl wait --for=condition=ready pod -l app=frontend -n ${NAMESPACE} --timeout=${TIMEOUT}
-                        echo "OK! Frontend pod is ready"
+                        echo "Waiting for frontend pod to be created..."
+                        kubectl wait --for=condition=podScheduled pod -l app=frontend -n ${NAMESPACE} --timeout=${TIMEOUT}
+                        echo "OK! Frontend pod is created"
                     '''
                     
-                    // Copy files to pods
+                    // Copy files to pods immediately
                     sh '''
                         echo "Copying files to pods..."
                         
@@ -386,17 +386,19 @@ EOF
                         echo "Copying dist files to frontend pod..."
                         kubectl cp frontend/dist/ ${NAMESPACE}/$FRONTEND_POD:/usr/share/nginx/html/
                         echo "OK! Dist files copied to frontend pod"
+                    '''
+                    
+                    // Now wait for pods to be ready
+                    sh '''
+                        echo "Waiting for pods to be ready..."
                         
-                        # Restart pods to pick up new files
-                        echo "Restarting pods to pick up new files..."
-                        kubectl delete pod $BACKEND_POD -n ${NAMESPACE}
-                        kubectl delete pod $FRONTEND_POD -n ${NAMESPACE}
-                        
-                        # Wait for new pods to be ready
-                        echo "Waiting for new pods to be ready..."
+                        echo "Waiting for backend pod..."
                         kubectl wait --for=condition=ready pod -l app=backend -n ${NAMESPACE} --timeout=${TIMEOUT}
+                        echo "OK! Backend pod is ready"
+                        
+                        echo "Waiting for frontend pod..."
                         kubectl wait --for=condition=ready pod -l app=frontend -n ${NAMESPACE} --timeout=${TIMEOUT}
-                        echo "OK! All pods are ready with new files"
+                        echo "OK! Frontend pod is ready"
                     '''
                 }
             }
