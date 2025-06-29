@@ -3,6 +3,15 @@ pipeline {
 
     tools {
         maven 'Maven 3.9.5'
+        jdk 'JDK 17'
+        nodejs 'NodeJS 18'
+    }
+
+    environment {
+        JAVA_HOME = tool('JDK 17')
+        MAVEN_HOME = tool('Maven 3.9.5')
+        NODE_HOME = tool('NodeJS 18')
+        PATH = "${env.JAVA_HOME}/bin:${env.MAVEN_HOME}/bin:${env.NODE_HOME}/bin:${env.PATH}"
     }
 
     stages {
@@ -25,6 +34,17 @@ pipeline {
                 dir('frontend') {
                     sh 'npm install'
                     sh 'npm run build'
+                }
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                dir('Ask') {
+                    sh 'docker build -t devops-pets-backend:latest .'
+                }
+                dir('frontend') {
+                    sh 'docker build -t devops-pets-frontend:latest .'
                 }
             }
         }
@@ -57,6 +77,10 @@ pipeline {
             DEPLOYMENT SUCCESSFUL!
             ========================================
             The backend and frontend have been deployed.
+            Backend should be available at: http://localhost:30080
+            Frontend should be available at: http://localhost:30000
+            MailHog UI: http://localhost:8025
+            PostgreSQL: localhost:5432
             '''
         }
         failure {
