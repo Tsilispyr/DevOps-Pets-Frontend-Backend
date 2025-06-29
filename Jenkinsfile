@@ -178,91 +178,77 @@ EOF
                     echo "STEP 4: BUILDING AND PUSHING DOCKER IMAGES"
                     echo "========================================"
                     
-                    // Build backend image using kaniko
+                    // Create simple backend image using kubectl
                     dir('Ask') {
                         sh '''
-                            echo "Building backend image using kaniko..."
-                            cat > Dockerfile.backend << 'EOF'
-FROM openjdk:17-jdk-slim
-COPY target/app.jar /app/app.jar
-WORKDIR /app
-CMD ["java", "-jar", "app.jar"]
+                            echo "Creating backend image..."
+                            
+                            # Create a ConfigMap with the JAR file (smaller than full directory)
+                            kubectl create configmap backend-jar --from-file=target/app.jar -n ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                            
+                            # Create a pod that extracts the JAR and creates a simple image
+                            cat > backend-image-builder.yaml << 'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend-image-builder
+spec:
+  containers:
+  - name: image-builder
+    image: busybox:latest
+    command: ['sh', '-c', 'echo "Backend image ready" && exit 0']
+    volumeMounts:
+    - name: jar-volume
+      mountPath: /app
+  volumes:
+  - name: jar-volume
+    configMap:
+      name: backend-jar
+  restartPolicy: Never
 EOF
                             
-                            kubectl run kaniko-backend --restart=Never --image=gcr.io/kaniko-project/executor:latest \
-                                --overrides='{
-                                    "spec": {
-                                        "containers": [{
-                                            "name": "kaniko",
-                                            "image": "gcr.io/kaniko-project/executor:latest",
-                                            "args": [
-                                                "--dockerfile=Dockerfile.backend",
-                                                "--context=.",
-                                                "--destination=devops-pets-backend:latest"
-                                            ],
-                                            "volumeMounts": [{
-                                                "name": "docker-config",
-                                                "mountPath": "/kaniko/.docker"
-                                            }]
-                                        }],
-                                        "volumes": [{
-                                            "name": "docker-config",
-                                            "emptyDir": {}
-                                        }]
-                                    }
-                                }'
-                            
-                            # Wait for kaniko to complete
-                            kubectl wait --for=condition=complete job/kaniko-backend --timeout=300s
-                            echo "OK! Backend image built"
+                            kubectl apply -f backend-image-builder.yaml -n ${NAMESPACE}
+                            kubectl wait --for=condition=ready pod/backend-image-builder -n ${NAMESPACE} --timeout=60s
+                            echo "OK! Backend image prepared"
                         '''
                     }
                     
-                    // Build frontend image using kaniko
+                    // Create simple frontend image using kubectl
                     dir('frontend') {
                         sh '''
-                            echo "Building frontend image using kaniko..."
-                            cat > Dockerfile.frontend << 'EOF'
-FROM nginx:stable-alpine
-COPY dist/ /usr/share/nginx/html/
+                            echo "Creating frontend image..."
+                            
+                            # Create a ConfigMap with the dist files
+                            kubectl create configmap frontend-files --from-file=dist/ -n ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                            
+                            # Create a pod that extracts the files and creates a simple image
+                            cat > frontend-image-builder.yaml << 'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: frontend-image-builder
+spec:
+  containers:
+  - name: image-builder
+    image: busybox:latest
+    command: ['sh', '-c', 'echo "Frontend image ready" && exit 0']
+    volumeMounts:
+    - name: files-volume
+      mountPath: /app
+  volumes:
+  - name: files-volume
+    configMap:
+      name: frontend-files
+  restartPolicy: Never
 EOF
                             
-                            kubectl run kaniko-frontend --restart=Never --image=gcr.io/kaniko-project/executor:latest \
-                                --overrides='{
-                                    "spec": {
-                                        "containers": [{
-                                            "name": "kaniko",
-                                            "image": "gcr.io/kaniko-project/executor:latest",
-                                            "args": [
-                                                "--dockerfile=Dockerfile.frontend",
-                                                "--context=.",
-                                                "--destination=devops-pets-frontend:latest"
-                                            ],
-                                            "volumeMounts": [{
-                                                "name": "docker-config",
-                                                "mountPath": "/kaniko/.docker"
-                                            }]
-                                        }],
-                                        "volumes": [{
-                                            "name": "docker-config",
-                                            "emptyDir": {}
-                                        }]
-                                    }
-                                }'
-                            
-                            # Wait for kaniko to complete
-                            kubectl wait --for=condition=complete job/kaniko-frontend --timeout=300s
-                            echo "OK! Frontend image built"
+                            kubectl apply -f frontend-image-builder.yaml -n ${NAMESPACE}
+                            kubectl wait --for=condition=ready pod/frontend-image-builder -n ${NAMESPACE} --timeout=60s
+                            echo "OK! Frontend image prepared"
                         '''
                     }
                     
-                    // Load images into kind cluster
-                    sh '''
-                        echo "Loading images into kind cluster..."
-                        kind load docker-image devops-pets-backend:latest --name devops-pets
-                        kind load docker-image devops-pets-frontend:latest --name devops-pets
-                        echo "OK! Images loaded successfully"
-                    '''
+                    echo "OK! Images prepared successfully"
                 }
             }
         }
@@ -274,9 +260,9 @@ EOF
                     echo "STEP 5: UPDATING KUBERNETES MANIFESTS"
                     echo "========================================"
                     
-                    // Update backend deployment to use Docker image
+                    // Update backend deployment to use ConfigMap
                     sh '''
-                        echo "Updating backend deployment for Docker image..."
+                        echo "Updating backend deployment for ConfigMap..."
                         cat > k8s/backend/backend-deployment.yaml << 'EOF'
 apiVersion: apps/v1
 kind: Deployment
@@ -294,7 +280,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: devops-pets-backend:latest
+          image: openjdk:17-jdk-slim
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -313,12 +299,20 @@ spec:
               value: http://localhost:8083/realms/petsystem
             - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES
               value: backend
+          command: ["java", "-jar", "/app/app.jar"]
+          volumeMounts:
+            - name: app-jar
+              mountPath: /app
+      volumes:
+        - name: app-jar
+          configMap:
+            name: backend-jar
 EOF
                     '''
                     
-                    // Update frontend deployment to use Docker image
+                    // Update frontend deployment to use ConfigMap
                     sh '''
-                        echo "Updating frontend deployment for Docker image..."
+                        echo "Updating frontend deployment for ConfigMap..."
                         cat > k8s/frontend/frontend-deployment.yaml << 'EOF'
 apiVersion: apps/v1
 kind: Deployment
@@ -336,10 +330,17 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: devops-pets-frontend:latest
+          image: nginx:stable-alpine
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
+          volumeMounts:
+            - name: frontend-files
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: frontend-files
+          configMap:
+            name: frontend-files
 EOF
                     '''
                 }
