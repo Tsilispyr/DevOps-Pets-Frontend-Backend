@@ -246,6 +246,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend
+  namespace: devops-pets
 spec:
   replicas: 1
   selector:
@@ -271,7 +272,7 @@ spec:
             - containerPort: 8080
           env:
             - name: SPRING_DATASOURCE_URL
-              value: jdbc:postgresql://postgres.default.svc.cluster.local:5432/petdb
+              value: jdbc:postgresql://postgres.devops-pets.svc.cluster.local:5432/petdb
             - name: SPRING_DATASOURCE_USERNAME
               value: petuser
             - name: SPRING_DATASOURCE_PASSWORD
@@ -302,6 +303,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
+  namespace: devops-pets
 spec:
   replicas: 1
   selector:
