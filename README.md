@@ -30,12 +30,12 @@ The Jenkins pipeline connects to the local Kubernetes cluster using the `jenkins
 ### Kubeconfig Details
 
 The `jenkins-kubeconfig` file contains:
-- **Cluster Server**: `https://host.docker.internal:6445` (kind cluster API server on host)
+- **Cluster Server**: `https://kubernetes.default.svc` (Kubernetes API service)
 - **Authentication**: Service account token for `jenkins-admin`
 - **Context**: `kind-devops-pets`
 - **Security**: `insecure-skip-tls-verify: true` for local development
 
-**Note**: `host.docker.internal` is used because Jenkins runs in a Docker container and needs to reach the Kubernetes cluster running on the host machine.
+**Note**: `kubernetes.default.svc` is the internal Kubernetes API service DNS name. This is stable and works from any pod inside the cluster, regardless of the control plane node's IP address.
 
 ## Deployment
 
