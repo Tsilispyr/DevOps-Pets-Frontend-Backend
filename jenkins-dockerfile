@@ -1,0 +1,43 @@
+# FROM jenkins/jenkins:lts
+
+# USER root
+
+# RUN apt-get update && apt-get install -y docker.io
+
+# RUN usermod -aG docker jenkins
+
+# USER jenkins
+
+
+
+# FROM jenkins/jenkins:lts
+
+# USER root
+
+# RUN apt-get update && apt-get install -y docker.io 
+# RUN groupadd -g 989 docker || true
+# RUN usermod -aG docker jenkins
+
+# USER jenkins
+
+
+# FROM jenkins/jenkins:lts
+
+# USER root
+
+# RUN apt-get update && apt-get install -y docker.io 
+# RUN groupadd -g 998 docker && usermod -aG docker jenkins
+
+# USER jenkins
+
+
+FROM jenkins/jenkins:lts
+
+      USER root
+   RUN apt-get update && apt-get install -y docker.io
+   RUN groupmod -g 989 docker && usermod -aG docker jenkins
+   USER jenkins
+
+# FROM jenkins/jenkins:lts
+
+# USER root

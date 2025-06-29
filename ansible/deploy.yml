@@ -1,0 +1,40 @@
+---
+- name: Deploy Backend to Kubernetes
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  
+  tasks:
+    - name: Check if kubectl is available
+      command: kubectl version --client
+      register: kubectl_check
+      failed_when: false
+      
+    - name: Fail if kubectl is not available
+      fail:
+        msg: "kubectl is not available. Please install kubectl first."
+      when: kubectl_check.rc != 0
+      
+    - name: Apply backend deployment
+      command: kubectl apply -f ../k8s/backend/backend-deployment.yaml
+      register: deployment_result
+      
+    - name: Apply backend service
+      command: kubectl apply -f ../k8s/backend/backend-service.yaml
+      register: service_result
+      
+    - name: Wait for deployment to be ready
+      command: kubectl rollout status deployment/backend --timeout=300s
+      register: rollout_result
+      
+    - name: Display deployment status
+      debug:
+        msg: "Backend deployment completed successfully!"
+        
+    - name: Get service information
+      command: kubectl get service backend
+      register: service_info
+      
+    - name: Display service information
+      debug:
+        msg: "{{ service_info.stdout_lines }}" 
