@@ -109,17 +109,43 @@ EOF
                         echo "Deleting existing deployments..."
                         kubectl delete deployment backend -n ${NAMESPACE} --ignore-not-found=true || true
                         kubectl delete deployment frontend -n ${NAMESPACE} --ignore-not-found=true || true
+                        kubectl delete deployment postgres -n ${NAMESPACE} --ignore-not-found=true || true
                         
                         echo "Deleting existing services..."
                         kubectl delete service backend -n ${NAMESPACE} --ignore-not-found=true || true
                         kubectl delete service frontend -n ${NAMESPACE} --ignore-not-found=true || true
+                        kubectl delete service postgres -n ${NAMESPACE} --ignore-not-found=true || true
                         
                         echo "Deleting any orphaned pods..."
                         kubectl delete pods -l app=backend -n ${NAMESPACE} --ignore-not-found=true || true
                         kubectl delete pods -l app=frontend -n ${NAMESPACE} --ignore-not-found=true || true
+                        kubectl delete pods -l app=postgres -n ${NAMESPACE} --ignore-not-found=true || true
                         
                         echo "Waiting for resources to be deleted..."
                         sleep 10
+                    '''
+                }
+            }
+        }
+
+        stage('Apply RBAC Configuration') {
+            steps {
+                script {
+                    echo "========================================"
+                    echo "STEP 2.5: APPLYING RBAC CONFIGURATION"
+                    echo "========================================"
+                    
+                    // Apply RBAC configuration first
+                    sh '''
+                        echo "Applying RBAC configuration..."
+                        kubectl apply -f k8s/jenkins/jenkins-rbac.yaml
+                        echo "OK! RBAC configuration applied"
+                        
+                        echo "Verifying service account permissions..."
+                        kubectl auth can-i get pods -n ${NAMESPACE}
+                        kubectl auth can-i create deployments -n ${NAMESPACE}
+                        kubectl auth can-i create services -n ${NAMESPACE}
+                        echo "OK! Permissions verified"
                     '''
                 }
             }
@@ -146,7 +172,7 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 3: PREPARING FILES FOR DEPLOYMENT"
+                    echo "STEP 4: PREPARING FILES FOR DEPLOYMENT"
                     echo "========================================"
                     
                     // Copy JAR file to target directory
@@ -175,7 +201,7 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 4: PREPARING DEPLOYMENT FILES"
+                    echo "STEP 5: PREPARING DEPLOYMENT FILES"
                     echo "========================================"
                     
                     // Prepare backend files
@@ -209,7 +235,7 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 5: UPDATING KUBERNETES MANIFESTS"
+                    echo "STEP 6: UPDATING KUBERNETES MANIFESTS"
                     echo "========================================"
                     
                     // Update backend deployment to use init container with file copy
@@ -315,7 +341,7 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 6: DEPLOYING TO KUBERNETES"
+                    echo "STEP 7: DEPLOYING TO KUBERNETES"
                     echo "========================================"
                     
                     // Apply all Kubernetes resources
@@ -378,7 +404,7 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 7: SETTING UP PORT FORWARDING"
+                    echo "STEP 8: SETTING UP PORT FORWARDING"
                     echo "========================================"
                     
                     // Kill any existing port forwards
@@ -438,7 +464,7 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 8: VERIFYING DEPLOYMENT"
+                    echo "STEP 9: VERIFYING DEPLOYMENT"
                     echo "========================================"
                     
                     // Verify all pods are running
