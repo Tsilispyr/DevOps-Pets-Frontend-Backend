@@ -24,20 +24,50 @@ pipeline {
                     echo "STEP 1: SETTING UP KUBECONFIG"
                     echo "========================================"
                     
-                    // Set up kubeconfig from the provided file
+                    // Set up kubeconfig with fresh token
                     sh '''
                         echo "Setting up kubeconfig for Jenkins..."
                         
                         # Create .kube directory if it doesn't exist
                         mkdir -p ~/.kube
                         
-                        # Copy the kubeconfig file
-                        cp jenkins-kubeconfig ~/.kube/config
+                        # Create a fresh service account token
+                        echo "Creating fresh service account token..."
+                        
+                        # Create service account if it doesn't exist
+                        kubectl create serviceaccount jenkins-admin -n kube-system --dry-run=client -o yaml | kubectl apply -f -
+                        
+                        # Create cluster role binding if it doesn't exist
+                        kubectl create clusterrolebinding jenkins-admin --clusterrole=cluster-admin --serviceaccount=kube-system:jenkins-admin --dry-run=client -o yaml | kubectl apply -f -
+                        
+                        # Get the fresh token
+                        TOKEN=$(kubectl create token jenkins-admin -n kube-system)
+                        
+                        # Create kubeconfig with fresh token
+                        cat > ~/.kube/config << EOF
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://kubernetes.default.svc
+    insecure-skip-tls-verify: true
+  name: devops-pets
+contexts:
+- context:
+    cluster: devops-pets
+    user: jenkins-admin
+  name: kind-devops-pets
+current-context: kind-devops-pets
+users:
+- name: jenkins-admin
+  user:
+    token: $TOKEN
+EOF
                         
                         # Set proper permissions
                         chmod 600 ~/.kube/config
                         
-                        echo "Kubeconfig set up successfully"
+                        echo "Kubeconfig set up successfully with fresh token"
                         
                         # Test cluster connection
                         echo "Testing cluster connection..."
