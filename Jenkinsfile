@@ -22,14 +22,49 @@ pipeline {
             }
         }
 
-        stage('Setup Docker Registry') {
-            when {
-                branch 'main'
-            }
+        stage('Setup Kubeconfig') {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 1: SETTING UP DOCKER REGISTRY"
+                    echo "STEP 1: SETTING UP KUBECONFIG"
+                    echo "========================================"
+                    
+                    // Get current cluster name and export kubeconfig
+                    sh '''
+                        echo "Getting current kind cluster..."
+                        CURRENT_CLUSTER=$(kind get clusters | head -n 1)
+                        echo "Current cluster: $CURRENT_CLUSTER"
+                        
+                        if [ -z "$CURRENT_CLUSTER" ]; then
+                            echo "ERR! No kind cluster found. Please ensure Devpets-main is deployed first."
+                            exit 1
+                        fi
+                        
+                        echo "Exporting kubeconfig for cluster: $CURRENT_CLUSTER"
+                        kind export kubeconfig --name $CURRENT_CLUSTER
+                        echo "OK! Kubeconfig exported"
+                        
+                        # Verify cluster connection
+                        kubectl cluster-info
+                        kubectl get nodes
+                        
+                        # Check if devops-pets namespace exists
+                        if kubectl get namespace devops-pets 2>/dev/null; then
+                            echo "OK! devops-pets namespace exists"
+                        else
+                            echo "Creating devops-pets namespace..."
+                            kubectl create namespace devops-pets
+                        fi
+                    '''
+                }
+            }
+        }
+
+        stage('Setup Docker Registry') {
+            steps {
+                script {
+                    echo "========================================"
+                    echo "STEP 2: SETTING UP DOCKER REGISTRY"
                     echo "========================================"
                     
                     // Start local Docker registry if not running
@@ -56,50 +91,41 @@ pipeline {
         }
 
         stage('Complete Cleanup') {
-            when {
-                branch 'main'
-            }
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 2: COMPLETE CLEANUP"
+                    echo "STEP 3: COMPLETE CLEANUP"
                     echo "========================================"
                     
-                    withCredentials([string(credentialsId: 'jenkins-kubeconfig-text', variable: 'KUBECONFIG_CONTENT')]) {
-                        writeFile file: 'jenkins-kubeconfig', text: env.KUBECONFIG_CONTENT
+                    // Stop all port forwarding
+                    sh '''
+                        pkill -f "kubectl port-forward" || true
+                        sleep 3
+                    '''
+                    
+                    // Delete existing deployments and services
+                    sh '''
+                        echo "Deleting existing deployments..."
+                        kubectl delete deployment backend -n ${NAMESPACE} --ignore-not-found=true || true
+                        kubectl delete deployment frontend -n ${NAMESPACE} --ignore-not-found=true || true
                         
-                        // Stop all port forwarding
-                        sh '''
-                            export KUBECONFIG=$PWD/jenkins-kubeconfig
-                            pkill -f "kubectl port-forward" || true
-                            sleep 3
-                        '''
+                        echo "Deleting existing services..."
+                        kubectl delete service backend -n ${NAMESPACE} --ignore-not-found=true || true
+                        kubectl delete service frontend -n ${NAMESPACE} --ignore-not-found=true || true
                         
-                        // Delete existing deployments and services
-                        sh '''
-                            export KUBECONFIG=$PWD/jenkins-kubeconfig
-                            echo "Deleting existing deployments..."
-                            kubectl delete deployment backend -n ${NAMESPACE} --ignore-not-found=true || true
-                            kubectl delete deployment frontend -n ${NAMESPACE} --ignore-not-found=true || true
-                            
-                            echo "Deleting existing services..."
-                            kubectl delete service backend -n ${NAMESPACE} --ignore-not-found=true || true
-                            kubectl delete service frontend -n ${NAMESPACE} --ignore-not-found=true || true
-                            
-                            echo "Deleting any orphaned pods..."
-                            kubectl delete pods -l app=backend -n ${NAMESPACE} --ignore-not-found=true || true
-                            kubectl delete pods -l app=frontend -n ${NAMESPACE} --ignore-not-found=true || true
-                            
-                            echo "Waiting for resources to be deleted..."
-                            sleep 10
-                        '''
+                        echo "Deleting any orphaned pods..."
+                        kubectl delete pods -l app=backend -n ${NAMESPACE} --ignore-not-found=true || true
+                        kubectl delete pods -l app=frontend -n ${NAMESPACE} --ignore-not-found=true || true
                         
-                        // Clean up old Docker images
-                        sh '''
-                            echo "Cleaning old Docker images..."
-                            docker images | grep devops-pets | tail -n +6 | awk '{print $3}' | xargs -r docker rmi -f || true
-                        '''
-                    }
+                        echo "Waiting for resources to be deleted..."
+                        sleep 10
+                    '''
+                    
+                    // Clean up old Docker images
+                    sh '''
+                        echo "Cleaning old Docker images..."
+                        docker images | grep devops-pets | tail -n +6 | awk '{print $3}' | xargs -r docker rmi -f || true
+                    '''
                 }
             }
         }
@@ -122,13 +148,10 @@ pipeline {
         }
 
         stage('Build and Push Docker Images') {
-            when {
-                branch 'main'
-            }
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 3: BUILDING AND PUSHING DOCKER IMAGES"
+                    echo "STEP 4: BUILDING AND PUSHING DOCKER IMAGES"
                     echo "========================================"
                     
                     // Build backend image
@@ -165,39 +188,29 @@ pipeline {
         }
 
         stage('Load Images to Cluster') {
-            when {
-                branch 'main'
-            }
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 4: LOADING IMAGES TO CLUSTER"
+                    echo "STEP 5: LOADING IMAGES TO CLUSTER"
                     echo "========================================"
                     
-                    withCredentials([string(credentialsId: 'jenkins-kubeconfig-text', variable: 'KUBECONFIG_CONTENT')]) {
-                        writeFile file: 'jenkins-kubeconfig', text: env.KUBECONFIG_CONTENT
-                        
-                        // Load images into kind cluster
-                        sh '''
-                            export KUBECONFIG=$PWD/jenkins-kubeconfig
-                            echo "Loading images into kind cluster..."
-                            kind load docker-image ${DOCKER_REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG} --name ${CLUSTER_NAME}
-                            kind load docker-image ${DOCKER_REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG} --name ${CLUSTER_NAME}
-                            echo "OK! Images loaded successfully"
-                        '''
-                    }
+                    // Get current cluster name and load images
+                    sh '''
+                        CURRENT_CLUSTER=$(kind get clusters | head -n 1)
+                        echo "Loading images into kind cluster: $CURRENT_CLUSTER"
+                        kind load docker-image ${DOCKER_REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG} --name $CURRENT_CLUSTER
+                        kind load docker-image ${DOCKER_REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG} --name $CURRENT_CLUSTER
+                        echo "OK! Images loaded successfully"
+                    '''
                 }
             }
         }
 
         stage('Update Kubernetes Manifests') {
-            when {
-                branch 'main'
-            }
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 5: UPDATING KUBERNETES MANIFESTS"
+                    echo "STEP 6: UPDATING KUBERNETES MANIFESTS"
                     echo "========================================"
                     
                     // Update backend deployment with new image
@@ -216,156 +229,131 @@ pipeline {
         }
 
         stage('Deploy to Kubernetes') {
-            when {
-                branch 'main'
-            }
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 6: DEPLOYING TO KUBERNETES"
+                    echo "STEP 7: DEPLOYING TO KUBERNETES"
                     echo "========================================"
                     
-                    withCredentials([string(credentialsId: 'jenkins-kubeconfig-text', variable: 'KUBECONFIG_CONTENT')]) {
-                        writeFile file: 'jenkins-kubeconfig', text: env.KUBECONFIG_CONTENT
+                    // Apply all Kubernetes resources
+                    sh '''
+                        echo "Applying Kubernetes resources..."
+                        kubectl apply -R -f k8s/ -n ${NAMESPACE}
+                        echo "OK! Resources applied"
+                    '''
+                    
+                    // Wait for deployments to be ready
+                    sh '''
+                        echo "Waiting for deployments to be ready..."
                         
-                        // Apply all Kubernetes resources
-                        sh '''
-                            export KUBECONFIG=$PWD/jenkins-kubeconfig
-                            echo "Applying Kubernetes resources..."
-                            kubectl apply -R -f k8s/ -n ${NAMESPACE}
-                            echo "OK! Resources applied"
-                        '''
+                        echo "Waiting for backend deployment..."
+                        kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/backend -n ${NAMESPACE}
+                        echo "OK! Backend deployment is ready"
                         
-                        // Wait for deployments to be ready
-                        sh '''
-                            export KUBECONFIG=$PWD/jenkins-kubeconfig
-                            echo "Waiting for deployments to be ready..."
-                            
-                            echo "Waiting for backend deployment..."
-                            kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/backend -n ${NAMESPACE}
-                            echo "OK! Backend deployment is ready"
-                            
-                            echo "Waiting for frontend deployment..."
-                            kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/frontend -n ${NAMESPACE}
-                            echo "OK! Frontend deployment is ready"
-                        '''
-                    }
+                        echo "Waiting for frontend deployment..."
+                        kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/frontend -n ${NAMESPACE}
+                        echo "OK! Frontend deployment is ready"
+                    '''
                 }
             }
         }
 
         stage('Setup Port Forwarding') {
-            when {
-                branch 'main'
-            }
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 7: SETTING UP PORT FORWARDING"
+                    echo "STEP 8: SETTING UP PORT FORWARDING"
                     echo "========================================"
                     
-                    withCredentials([string(credentialsId: 'jenkins-kubeconfig-text', variable: 'KUBECONFIG_CONTENT')]) {
-                        writeFile file: 'jenkins-kubeconfig', text: env.KUBECONFIG_CONTENT
+                    // Kill any existing port forwards
+                    sh '''
+                        pkill -f "kubectl port-forward.*backend" || true
+                        pkill -f "kubectl port-forward.*frontend" || true
+                        sleep 2
+                    '''
+                    
+                    // Start backend port forward
+                    sh '''
+                        echo "Starting backend port forward (30080:8080)..."
+                        kubectl port-forward -n ${NAMESPACE} service/backend 30080:8080 &
+                        BACKEND_PID=$!
+                        echo $BACKEND_PID > /tmp/backend-port-forward.pid
+                        echo "OK! Backend port forward is running (PID: $BACKEND_PID)"
+                    '''
+                    
+                    // Start frontend port forward
+                    sh '''
+                        echo "Starting frontend port forward (30000:80)..."
+                        kubectl port-forward -n ${NAMESPACE} service/frontend 30000:80 &
+                        FRONTEND_PID=$!
+                        echo $FRONTEND_PID > /tmp/frontend-port-forward.pid
+                        echo "OK! Frontend port forward is running (PID: $FRONTEND_PID)"
+                    '''
+                    
+                    // Wait for port forwards to establish
+                    sh '''
+                        echo "Waiting for port forwards to establish..."
+                        sleep 5
                         
-                        // Kill any existing port forwards
-                        sh '''
-                            export KUBECONFIG=$PWD/jenkins-kubeconfig
-                            pkill -f "kubectl port-forward.*backend" || true
-                            pkill -f "kubectl port-forward.*frontend" || true
-                            sleep 2
-                        '''
-                        
-                        // Start backend port forward
-                        sh '''
-                            export KUBECONFIG=$PWD/jenkins-kubeconfig
-                            echo "Starting backend port forward (30080:8080)..."
-                            kubectl port-forward -n ${NAMESPACE} service/backend 30080:8080 &
-                            BACKEND_PID=$!
-                            echo $BACKEND_PID > /tmp/backend-port-forward.pid
-                            echo "OK! Backend port forward is running (PID: $BACKEND_PID)"
-                        '''
-                        
-                        // Start frontend port forward
-                        sh '''
-                            export KUBECONFIG=$PWD/jenkins-kubeconfig
-                            echo "Starting frontend port forward (30000:80)..."
-                            kubectl port-forward -n ${NAMESPACE} service/frontend 30000:80 &
-                            FRONTEND_PID=$!
-                            echo $FRONTEND_PID > /tmp/frontend-port-forward.pid
-                            echo "OK! Frontend port forward is running (PID: $FRONTEND_PID)"
-                        '''
-                        
-                        // Wait for port forwards to establish
-                        sh '''
-                            echo "Waiting for port forwards to establish..."
-                            sleep 5
-                            
-                            # Check if port forwards are running
-                            if [ -f /tmp/backend-port-forward.pid ]; then
-                                BACKEND_PID=$(cat /tmp/backend-port-forward.pid)
-                                if kill -0 $BACKEND_PID 2>/dev/null; then
-                                    echo "OK! Backend port forward is running"
-                                else
-                                    echo "ERR! Backend port forward failed to start"
-                                fi
+                        # Check if port forwards are running
+                        if [ -f /tmp/backend-port-forward.pid ]; then
+                            BACKEND_PID=$(cat /tmp/backend-port-forward.pid)
+                            if kill -0 $BACKEND_PID 2>/dev/null; then
+                                echo "OK! Backend port forward is running"
+                            else
+                                echo "ERR! Backend port forward failed to start"
                             fi
-                            
-                            if [ -f /tmp/frontend-port-forward.pid ]; then
-                                FRONTEND_PID=$(cat /tmp/frontend-port-forward.pid)
-                                if kill -0 $FRONTEND_PID 2>/dev/null; then
-                                    echo "OK! Frontend port forward is running"
-                                else
-                                    echo "ERR! Frontend port forward failed to start"
-                                fi
+                        fi
+                        
+                        if [ -f /tmp/frontend-port-forward.pid ]; then
+                            FRONTEND_PID=$(cat /tmp/frontend-port-forward.pid)
+                            if kill -0 $FRONTEND_PID 2>/dev/null; then
+                                echo "OK! Frontend port forward is running"
+                            else
+                                echo "ERR! Frontend port forward failed to start"
                             fi
-                        '''
-                    }
+                        fi
+                    '''
                 }
             }
         }
 
         stage('Verify Deployment') {
-            when {
-                branch 'main'
-            }
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 8: VERIFYING DEPLOYMENT"
+                    echo "STEP 9: VERIFYING DEPLOYMENT"
                     echo "========================================"
                     
-                    withCredentials([string(credentialsId: 'jenkins-kubeconfig-text', variable: 'KUBECONFIG_CONTENT')]) {
-                        writeFile file: 'jenkins-kubeconfig', text: env.KUBECONFIG_CONTENT
+                    // Verify all pods are running
+                    sh '''
+                        echo "Verifying all pods are running..."
+                        kubectl get pods -n ${NAMESPACE} -o wide
                         
-                        // Verify all pods are running
-                        sh '''
-                            export KUBECONFIG=$PWD/jenkins-kubeconfig
-                            echo "Verifying all pods are running..."
-                            kubectl get pods -n ${NAMESPACE} -o wide
-                            
-                            echo "=== Backend Deployment Status ==="
-                            kubectl get deployment backend -n ${NAMESPACE}
-                            kubectl get pods -l app=backend -n ${NAMESPACE}
-                            
-                            echo "=== Frontend Deployment Status ==="
-                            kubectl get deployment frontend -n ${NAMESPACE}
-                            kubectl get pods -l app=frontend -n ${NAMESPACE}
-                            
-                            echo "=== Services ==="
-                            kubectl get services -n ${NAMESPACE}
-                        '''
+                        echo "=== Backend Deployment Status ==="
+                        kubectl get deployment backend -n ${NAMESPACE}
+                        kubectl get pods -l app=backend -n ${NAMESPACE}
                         
-                        // Final verification that all deployments are ready
-                        sh '''
-                            export KUBECONFIG=$PWD/jenkins-kubeconfig
-                            echo "Final verification - ensuring all deployments are ready..."
-                            
-                            kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/backend -n ${NAMESPACE}
-                            kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/frontend -n ${NAMESPACE}
-                            
-                            echo "OK! All deployments are fully ready"
-                        '''
-                    }
+                        echo "=== Frontend Deployment Status ==="
+                        kubectl get deployment frontend -n ${NAMESPACE}
+                        kubectl get pods -l app=frontend -n ${NAMESPACE}
+                        
+                        echo "=== Services ==="
+                        kubectl get services -n ${NAMESPACE}
+                        
+                        echo "=== Infrastructure Services (from Devpets-main) ==="
+                        kubectl get services -n devops-pets | grep -E "(postgres|mailhog|jenkins)"
+                    '''
+                    
+                    // Final verification that all deployments are ready
+                    sh '''
+                        echo "Final verification - ensuring all deployments are ready..."
+                        
+                        kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/backend -n ${NAMESPACE}
+                        kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/frontend -n ${NAMESPACE}
+                        
+                        echo "OK! All deployments are fully ready"
+                    '''
                 }
             }
         }
