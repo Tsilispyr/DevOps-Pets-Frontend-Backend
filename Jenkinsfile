@@ -189,7 +189,7 @@ WORKDIR /app
 CMD ["java", "-jar", "app.jar"]
 EOF
                             
-                            kubectl run kaniko-backend --rm --restart=Never --image=gcr.io/kaniko-project/executor:latest \
+                            kubectl run kaniko-backend --restart=Never --image=gcr.io/kaniko-project/executor:latest \
                                 --overrides='{
                                     "spec": {
                                         "containers": [{
@@ -211,6 +211,9 @@ EOF
                                         }]
                                     }
                                 }'
+                            
+                            # Wait for kaniko to complete
+                            kubectl wait --for=condition=complete job/kaniko-backend --timeout=300s
                             echo "OK! Backend image built"
                         '''
                     }
@@ -224,7 +227,7 @@ FROM nginx:stable-alpine
 COPY dist/ /usr/share/nginx/html/
 EOF
                             
-                            kubectl run kaniko-frontend --rm --restart=Never --image=gcr.io/kaniko-project/executor:latest \
+                            kubectl run kaniko-frontend --restart=Never --image=gcr.io/kaniko-project/executor:latest \
                                 --overrides='{
                                     "spec": {
                                         "containers": [{
@@ -246,6 +249,9 @@ EOF
                                         }]
                                     }
                                 }'
+                            
+                            # Wait for kaniko to complete
+                            kubectl wait --for=condition=complete job/kaniko-frontend --timeout=300s
                             echo "OK! Frontend image built"
                         '''
                     }
