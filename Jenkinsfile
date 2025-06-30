@@ -367,41 +367,9 @@ EOF
                         echo "Force deleting existing nginx ConfigMap..."
                         kubectl delete configmap nginx-config -n ${NAMESPACE} --ignore-not-found=true
                         
-                        # Create nginx ConfigMap with correct configuration
-                        echo "Creating nginx ConfigMap with correct configuration..."
-                        cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-  namespace: ${NAMESPACE}
-data:
-  nginx.conf: |
-    server {
-        listen 80;
-        server_name localhost;
-
-        root /usr/share/nginx/html;
-        index index.html;
-
-        location / {
-            try_files \$uri \$uri/ /index.html;
-        }
-
-        location /api/ {
-            proxy_pass http://backend:8080/api/;
-            proxy_set_header Host \$host;
-            proxy_set_header X-Real-IP \$remote_addr;
-            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto \$scheme;
-        }
-
-        location ~* \\.(?:ico|css|js|gif|jpe?g|png)$ {
-            expires 1y;
-            add_header Cache-Control "public";
-        }
-    }
-EOF
+                        # Create nginx ConfigMap using the YAML file
+                        echo "Creating nginx ConfigMap using YAML file..."
+                        kubectl apply -f nginx-config.yaml
                         
                         echo "Verifying nginx ConfigMap..."
                         kubectl get configmap nginx-config -n ${NAMESPACE} -o yaml
