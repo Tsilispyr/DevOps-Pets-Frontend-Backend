@@ -496,6 +496,76 @@ EOF
                 }
             }
         }
+
+        stage('Setup Port Forwarding') {
+            steps {
+                script {
+                    echo "========================================"
+                    echo "STEP 8: SETTING UP PORT FORWARDING"
+                    echo "========================================"
+                    
+                    // Start port forwarding in background
+                    sh '''
+                        echo "Starting port forwarding..."
+                        
+                        # Kill any existing port forwards
+                        pkill -f "kubectl port-forward.*backend" || true
+                        pkill -f "kubectl port-forward.*frontend" || true
+                        sleep 2
+                        
+                        # Start backend port forward
+                        echo "Starting backend port forward (30080:8080)..."
+                        nohup kubectl port-forward -n ${NAMESPACE} service/backend 30080:8080 > /tmp/backend-port-forward.log 2>&1 &
+                        BACKEND_PID=$!
+                        echo $BACKEND_PID > /tmp/backend-port-forward.pid
+                        echo "Backend port forward PID: $BACKEND_PID"
+                        
+                        # Start frontend port forward
+                        echo "Starting frontend port forward (30000:80)..."
+                        nohup kubectl port-forward -n ${NAMESPACE} service/frontend 30000:80 > /tmp/frontend-port-forward.log 2>&1 &
+                        FRONTEND_PID=$!
+                        echo $FRONTEND_PID > /tmp/frontend-port-forward.pid
+                        echo "Frontend port forward PID: $FRONTEND_PID"
+                        
+                        # Wait for port forwards to establish
+                        echo "Waiting for port forwards to establish..."
+                        sleep 10
+                        
+                        # Check if port forwards are running
+                        if [ -f /tmp/backend-port-forward.pid ]; then
+                            BACKEND_PID=$(cat /tmp/backend-port-forward.pid)
+                            if kill -0 $BACKEND_PID 2>/dev/null; then
+                                echo "✅ Backend port forward is running (PID: $BACKEND_PID)"
+                                echo "Backend log:"
+                                tail -5 /tmp/backend-port-forward.log
+                            else
+                                echo "❌ Backend port forward failed to start"
+                                echo "Backend log:"
+                                cat /tmp/backend-port-forward.log
+                            fi
+                        fi
+                        
+                        if [ -f /tmp/frontend-port-forward.pid ]; then
+                            FRONTEND_PID=$(cat /tmp/frontend-port-forward.pid)
+                            if kill -0 $FRONTEND_PID 2>/dev/null; then
+                                echo "✅ Frontend port forward is running (PID: $FRONTEND_PID)"
+                                echo "Frontend log:"
+                                tail -5 /tmp/frontend-port-forward.log
+                            else
+                                echo "❌ Frontend port forward failed to start"
+                                echo "Frontend log:"
+                                cat /tmp/frontend-port-forward.log
+                            fi
+                        fi
+                        
+                        echo "Port forwarding setup complete!"
+                        echo "Access your application at:"
+                        echo "- Frontend: http://localhost:30000"
+                        echo "- Backend: http://localhost:30080"
+                    '''
+                }
+            }
+        }
     }
 
     post {
@@ -511,18 +581,25 @@ EOF
             - Backend: Spring Boot JAR deployed
             - Frontend: Vue.js build deployed with nginx proxy
             
-            Access Points (NodePort Services):
+            Access Points (Port Forwarding):
             - Frontend App: http://localhost:30000
             - Backend API (direct): http://localhost:30080
             - Backend API (via nginx): http://localhost:30000/api/
-            - MailHog UI: http://localhost:8025
-            - PostgreSQL: localhost:5432
+            
+            ========================================
+            PORT FORWARDING STATUS
+            ========================================
+            Port forwarding is running in background:
+            - Backend: PID stored in /tmp/backend-port-forward.pid
+            - Frontend: PID stored in /tmp/frontend-port-forward.pid
+            - Logs: /tmp/backend-port-forward.log, /tmp/frontend-port-forward.log
             
             ========================================
             USEFUL COMMANDS
             ========================================
             - Check status: kubectl get all -n devops-pets
             - View logs: kubectl logs -n devops-pets <pod-name>
+            - Stop port forwarding: pkill -f 'kubectl port-forward'
             - Check nginx config: kubectl exec -n devops-pets <frontend-pod> -- cat /etc/nginx/conf.d/default.conf
             ========================================
             '''
