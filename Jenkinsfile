@@ -257,8 +257,10 @@ spec:
       initContainers:
         - name: copy-jar
           image: busybox:latest
-          command: ['sh', '-c', 'echo "Backend JAR will be copied during deployment" && exit 0']
+          command: ['sh', '-c', 'cp /shared/app.jar /app/app.jar && echo "JAR copied successfully"']
           volumeMounts:
+            - name: shared-storage
+              mountPath: /shared
             - name: app-jar
               mountPath: /app
       containers:
@@ -289,6 +291,9 @@ spec:
       volumes:
         - name: app-jar
           emptyDir: {}
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: shared-storage
 EOF
                     '''
                     
@@ -314,10 +319,12 @@ spec:
       initContainers:
         - name: copy-files
           image: busybox:latest
-          command: ['sh', '-c', 'echo "Frontend files will be copied during deployment" && exit 0']
+          command: ['sh', '-c', 'cp -r /shared/frontend/* /usr/share/nginx/html/ && echo "Frontend files copied successfully"']
           volumeMounts:
+            - name: shared-storage
+              mountPath: /shared
             - name: frontend-files
-              mountPath: /app
+              mountPath: /usr/share/nginx/html
       containers:
         - name: frontend
           image: nginx:stable-alpine
@@ -330,6 +337,9 @@ spec:
       volumes:
         - name: frontend-files
           emptyDir: {}
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: shared-storage
 EOF
                     '''
                 }
