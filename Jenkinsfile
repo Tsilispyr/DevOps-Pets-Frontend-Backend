@@ -214,6 +214,25 @@ EOF
                 dir('frontend') {
                     sh 'npm install'
                     sh 'npm run build'
+                    
+                    // Debug: Check frontend build output
+                    sh '''
+                        echo "=== DEBUG: FRONTEND BUILD OUTPUT ==="
+                        echo "Files in dist/:"
+                        ls -la dist/
+                        echo ""
+                        echo "index.html content (first 20 lines):"
+                        head -20 dist/index.html
+                        echo ""
+                        echo "index.html size:"
+                        ls -lh dist/index.html
+                        echo ""
+                        echo "Assets directory:"
+                        ls -la dist/assets/
+                        echo ""
+                        echo "Total dist size:"
+                        du -sh dist/
+                    '''
                 }
             }
         }
@@ -341,6 +360,8 @@ spec:
           volumeMounts:
             - name: app-jar
               mountPath: /app
+            - name: shared-storage
+              mountPath: /shared
       volumes:
         - name: app-jar
           emptyDir: {}
@@ -387,6 +408,8 @@ spec:
           volumeMounts:
             - name: frontend-files
               mountPath: /usr/share/nginx/html
+            - name: shared-storage
+              mountPath: /shared
             - name: nginx-config
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: nginx.conf
@@ -453,6 +476,15 @@ EOF
                     sh '''
                         echo "Copying files to shared storage..."
                         
+                        # Debug: Check PVC status
+                        echo "=== DEBUG: PVC STATUS ==="
+                        kubectl get pvc -n ${NAMESPACE}
+                        kubectl describe pvc shared-storage -n ${NAMESPACE}
+                        
+                        # Debug: Check if shared storage exists
+                        echo "=== DEBUG: SHARED STORAGE STATUS ==="
+                        kubectl get pv | grep shared-storage || echo "No shared-storage PV found"
+                        
                         # Create a temporary pod to copy files to shared storage
                         echo "Creating temporary pod for file copying..."
                         cat <<EOF | kubectl apply -f -
@@ -477,7 +509,12 @@ spec:
 EOF
                         
                         # Wait for the pod to be ready
+                        echo "Waiting for file-copy-pod to be ready..."
                         kubectl wait --for=condition=ready pod/file-copy-pod -n ${NAMESPACE} --timeout=60s
+                        
+                        # Debug: Check if pod can access shared storage
+                        echo "=== DEBUG: SHARED STORAGE ACCESS ==="
+                        kubectl exec -n ${NAMESPACE} file-copy-pod -- ls -la /shared/ || echo "Cannot access /shared/"
                         
                         # Copy JAR to shared storage
                         echo "Copying JAR to shared storage..."
@@ -488,6 +525,20 @@ EOF
                         echo "Copying frontend files to shared storage..."
                         kubectl cp frontend/dist/ ${NAMESPACE}/file-copy-pod:/shared/frontend/
                         echo "OK! Frontend files copied to shared storage"
+                        
+                        # Verify files were copied correctly
+                        echo "=== DEBUG: VERIFYING FILES IN SHARED STORAGE ==="
+                        echo "Files in /shared/:"
+                        kubectl exec -n ${NAMESPACE} file-copy-pod -- ls -la /shared/
+                        echo ""
+                        echo "Files in /shared/frontend/:"
+                        kubectl exec -n ${NAMESPACE} file-copy-pod -- ls -la /shared/frontend/
+                        echo ""
+                        echo "Frontend index.html content (first 10 lines):"
+                        kubectl exec -n ${NAMESPACE} file-copy-pod -- head -10 /shared/frontend/index.html || echo "Cannot read index.html"
+                        echo ""
+                        echo "JAR file size:"
+                        kubectl exec -n ${NAMESPACE} file-copy-pod -- ls -lh /shared/app.jar || echo "Cannot read app.jar"
                         
                         # Delete the temporary pod
                         kubectl delete pod file-copy-pod -n ${NAMESPACE}
@@ -505,6 +556,41 @@ EOF
                         echo "Waiting for frontend pod..."
                         kubectl wait --for=condition=ready pod -l app=frontend -n ${NAMESPACE} --timeout=${TIMEOUT}
                         echo "OK! Frontend pod is ready"
+                        
+                        # Debug: Check pod volume mounts
+                        echo "=== DEBUG: POD VOLUME MOUNTS ==="
+                        echo "Backend pod volume mounts:"
+                        kubectl get pod -l app=backend -n ${NAMESPACE} -o jsonpath='{.items[0].spec.volumes[*].name}' | tr ' ' '\n'
+                        echo ""
+                        echo "Frontend pod volume mounts:"
+                        kubectl get pod -l app=frontend -n ${NAMESPACE} -o jsonpath='{.items[0].spec.volumes[*].name}' | tr ' ' '\n'
+                        
+                        # Debug: Check init container logs
+                        echo "=== DEBUG: INIT CONTAINER LOGS ==="
+                        echo "Backend init container logs:"
+                        kubectl logs -n ${NAMESPACE} -l app=backend -c copy-jar || echo "No init container logs found"
+                        echo ""
+                        echo "Frontend init container logs:"
+                        kubectl logs -n ${NAMESPACE} -l app=frontend -c copy-files || echo "No init container logs found"
+                        
+                        # Debug: Check if pods can access shared storage
+                        echo "=== DEBUG: POD SHARED STORAGE ACCESS ==="
+                        echo "Backend pod shared storage access:"
+                        kubectl exec -n ${NAMESPACE} -l app=backend -- ls -la /shared/ || echo "Backend cannot access /shared/"
+                        echo ""
+                        echo "Frontend pod shared storage access:"
+                        kubectl exec -n ${NAMESPACE} -l app=frontend -- ls -la /shared/ || echo "Frontend cannot access /shared/"
+                        
+                        # Debug: Check actual files in pods
+                        echo "=== DEBUG: ACTUAL FILES IN PODS ==="
+                        echo "Backend JAR file:"
+                        kubectl exec -n ${NAMESPACE} -l app=backend -- ls -lh /app/app.jar || echo "Backend JAR not found"
+                        echo ""
+                        echo "Frontend files:"
+                        kubectl exec -n ${NAMESPACE} -l app=frontend -- ls -la /usr/share/nginx/html/ || echo "Frontend files not found"
+                        echo ""
+                        echo "Frontend index.html content (first 10 lines):"
+                        kubectl exec -n ${NAMESPACE} -l app=frontend -- head -10 /usr/share/nginx/html/index.html || echo "Cannot read frontend index.html"
                     '''
                 }
             }
