@@ -688,57 +688,30 @@ EOF
     }
 
     post {
-        always {
-            echo 'Pipeline completed!'
-        }
         success {
-            echo '''
-            ========================================
-            DEPLOYMENT SUCCESSFUL!
-            ========================================
-            Applications have been built, deployed, and verified as FUNCTIONAL:
-            - Backend: Spring Boot JAR deployed and responding (Port: 8080)
-            - Frontend: Vue.js build deployed and responding (Port: 80)
-            - Shared Storage: Files copied successfully
-            - Services: Backend and Frontend services created and ready
-            
-            STATUS: READY FOR ANSIBLE DETECTION
-            ========================================
-            Both applications are now functional and ready for Devpets-main Ansible
-            to detect them and start port forwarding automatically.
-            
-            Access Points:
-            ========================================
-            INTERNAL ACCESS (within cluster):
-            - Frontend Service: Port 80 (HTTP) - FUNCTIONAL
-            - Backend Service: Port 8080 (HTTP) - FUNCTIONAL
-            
-            EXTERNAL ACCESS (via Devpets-main Ansible):
-            - Frontend: http://localhost:3000 (when Ansible starts port forwarding)
-            - Backend API: http://localhost:3000/api (when Ansible starts port forwarding)
-            
-            ========================================
-            FOR USERS (Browser Access)
-            ========================================
-            Applications are ready! Devpets-main Ansible will automatically:
-            1. Detect the functional applications
-            2. Start port forwarding
-            3. Provide access at:
-               - Frontend: http://localhost:3000
-               - Backend API: http://localhost:3000/api
-            
-            ========================================
-            USEFUL COMMANDS
-            ========================================
-            - Check services: kubectl get services -n devops-pets
-            - View logs: kubectl logs -n devops-pets <pod-name>
-            - Check shared storage: kubectl exec -n devops-pets <pod-name> -- ls -la /shared/
-            - Access Jenkins: http://localhost:8082
-            ========================================
-            '''
+            script {
+                echo "Build successful. Creating signal ConfigMap..."
+                // Use the build number to create a unique name for the signal
+                def signalName = "build-signal-${BUILD_NUMBER}"
+                
+                // Cleanup any previous signal that might have been left over for robustness
+                sh "kubectl -n devops-pets delete configmap -l build-complete=true --ignore-not-found=true"
+
+                // Create the new signal ConfigMap and label it
+                sh """
+                kubectl -n devops-pets create configmap ${signalName} --from-literal=status=success
+                kubectl -n devops-pets label configmap ${signalName} build-complete=true
+                """
+                echo "Signal ConfigMap ${signalName} created."
+            }
         }
         failure {
-            echo 'Deployment failed! Check the logs for more details.'
+            script {
+                echo "Build failed. No signal will be created."
+            }
+        }
+        always {
+            echo "Pipeline finished."
         }
     }
 }

@@ -10,8 +10,8 @@ metadata:
   name: jenkins
 rules:
   - apiGroups: [""]
-    resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
-    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
+    resources: ["pods", "pods/log", "pods/exec", "services", "deployments", "replicasets", "persistentvolumeclaims", "configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["apps"]
     resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
     verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
