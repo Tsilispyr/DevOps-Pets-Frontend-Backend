@@ -556,6 +556,73 @@ EOF
                 }
             }
         }
+
+        stage('Setup Ingress') {
+            steps {
+                script {
+                    echo "========================================"
+                    echo "STEP 10: SETTING UP INGRESS"
+                    echo "========================================"
+                    
+                    // Install nginx-ingress controller if not already installed
+                    sh '''
+                        echo "Checking if nginx-ingress controller is installed..."
+                        
+                        if ! kubectl get namespace ingress-nginx 2>/dev/null; then
+                            echo "Installing nginx-ingress controller..."
+                            kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/kind/deploy.yaml
+                            
+                            echo "Waiting for nginx-ingress controller to be ready..."
+                            kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=300s
+                            
+                            echo "✅ nginx-ingress controller installed"
+                        else
+                            echo "✅ nginx-ingress controller already installed"
+                        fi
+                        
+                        echo "Creating Ingress resource..."
+                        cat <<EOF | kubectl apply -f -
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  namespace: ${NAMESPACE}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: localhost
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: backend
+            port:
+              number: 8080
+EOF
+                        
+                        echo "Waiting for Ingress to be ready..."
+                        kubectl wait --for=condition=ready ingress/app-ingress -n ${NAMESPACE} --timeout=60s
+                        
+                        echo "✅ Ingress configured successfully"
+                        echo "Access your application at:"
+                        echo "- Frontend: http://localhost"
+                        echo "- Backend API: http://localhost/api"
+                    '''
+                }
+            }
+        }
     }
 
     post {
@@ -570,24 +637,27 @@ EOF
             Applications have been built and deployed:
             - Backend: Spring Boot JAR deployed
             - Frontend: Vue.js build deployed with nginx proxy
+            - LoadBalancer: MetalLB configured with external IPs
+            - Ingress: nginx-ingress controller configured
             
-            Access Points (LoadBalancer Services):
-            - Frontend: Check external IP with: kubectl get service frontend -n devops-pets
-            - Backend: Check external IP with: kubectl get service backend -n devops-pets
-            - Backend API (via nginx): <frontend-ip>/api/
+            Access Points (FULLY AUTOMATED):
+            - Frontend: http://localhost
+            - Backend API: http://localhost/api
+            - LoadBalancer IPs: Check with 'kubectl get services -n devops-pets'
             
             ========================================
-            LOADBALANCER SERVICES
+            INGRESS SETUP
             ========================================
-            Services are automatically accessible via LoadBalancer:
-            - No port forwarding needed
-            - External IPs assigned automatically
-            - Fully automated deployment
+            Ingress controller automatically routes traffic:
+            - No manual port forwarding needed
+            - Services accessible via http://localhost
+            - Fully automated deployment and access
             
             ========================================
             USEFUL COMMANDS
             ========================================
             - Check services: kubectl get services -n devops-pets
+            - Check ingress: kubectl get ingress -n devops-pets
             - View logs: kubectl logs -n devops-pets <pod-name>
             - Check nginx config: kubectl exec -n devops-pets <frontend-pod> -- cat /etc/nginx/conf.d/default.conf
             ========================================
