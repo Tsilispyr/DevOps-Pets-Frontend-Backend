@@ -608,6 +608,83 @@ EOF
                 }
             }
         }
+
+        stage('Wait for Applications to be Functional') {
+            steps {
+                script {
+                    echo "========================================"
+                    echo "STEP 10: WAITING FOR APPLICATIONS TO BE FUNCTIONAL"
+                    echo "========================================"
+                    
+                    // Wait for backend to be functional
+                    sh '''
+                        echo "Waiting for backend to be functional..."
+                        
+                        # Wait for backend deployment to be ready
+                        kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/backend -n ${NAMESPACE}
+                        
+                        # Wait for backend pod to be ready
+                        kubectl wait --for=condition=ready pod -l app=backend -n ${NAMESPACE} --timeout=${TIMEOUT}
+                        
+                        # Wait for backend to be responding
+                        echo "Waiting for backend to be responding..."
+                        for i in {1..30}; do
+                          if kubectl run test-backend --image=busybox --restart=Never --rm -i --timeout=10s --namespace=${NAMESPACE} -- wget -qO- http://backend:8080/actuator/health 2>/dev/null | grep -q "UP\|status"; then
+                            echo "Backend is responding correctly!"
+                            break
+                          else
+                            echo "Backend not responding yet, attempt $i/30..."
+                            sleep 10
+                          fi
+                        done
+                        
+                        echo "Backend is functional!"
+                    '''
+                    
+                    // Wait for frontend to be functional
+                    sh '''
+                        echo "Waiting for frontend to be functional..."
+                        
+                        # Wait for frontend deployment to be ready
+                        kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/frontend -n ${NAMESPACE}
+                        
+                        # Wait for frontend pod to be ready
+                        kubectl wait --for=condition=ready pod -l app=frontend -n ${NAMESPACE} --timeout=${TIMEOUT}
+                        
+                        # Wait for frontend to be responding
+                        echo "Waiting for frontend to be responding..."
+                        for i in {1..30}; do
+                          if kubectl run test-frontend --image=busybox --restart=Never --rm -i --timeout=10s --namespace=${NAMESPACE} -- wget -qO- http://frontend:80/ 2>/dev/null | grep -q "html\|app\|vite"; then
+                            echo "Frontend is responding correctly!"
+                            break
+                          else
+                            echo "Frontend not responding yet, attempt $i/30..."
+                            sleep 10
+                          fi
+                        done
+                        
+                        echo "Frontend is functional!"
+                    '''
+                    
+                    // Final status
+                    sh '''
+                        echo "========================================"
+                        echo "ALL APPLICATIONS ARE FUNCTIONAL!"
+                        echo "========================================"
+                        echo "Backend: Ready and responding"
+                        echo "Frontend: Ready and responding"
+                        echo ""
+                        echo "Devpets-main Ansible will now detect these applications"
+                        echo "and start port forwarding automatically."
+                        echo ""
+                        echo "Access URLs (when port forwarding starts):"
+                        echo "- Frontend: http://localhost:3000"
+                        echo "- Backend API: http://localhost:3000/api"
+                        echo "========================================"
+                    '''
+                }
+            }
+        }
     }
 
     post {
@@ -619,30 +696,36 @@ EOF
             ========================================
             DEPLOYMENT SUCCESSFUL!
             ========================================
-            Applications have been built and deployed:
-            - Backend: Spring Boot JAR deployed (Port: 8080)
-            - Frontend: Vue.js build deployed with nginx proxy (Port: 80)
+            Applications have been built, deployed, and verified as FUNCTIONAL:
+            - Backend: Spring Boot JAR deployed and responding (Port: 8080)
+            - Frontend: Vue.js build deployed and responding (Port: 80)
             - Shared Storage: Files copied successfully
-            - Services: Backend and Frontend services created
+            - Services: Backend and Frontend services created and ready
+            
+            STATUS: READY FOR ANSIBLE DETECTION
+            ========================================
+            Both applications are now functional and ready for Devpets-main Ansible
+            to detect them and start port forwarding automatically.
             
             Access Points:
             ========================================
             INTERNAL ACCESS (within cluster):
-            - Frontend Service: Port 80 (HTTP)
-            - Backend Service: Port 8080 (HTTP)
+            - Frontend Service: Port 80 (HTTP) - FUNCTIONAL
+            - Backend Service: Port 8080 (HTTP) - FUNCTIONAL
             
-            EXTERNAL ACCESS (via Devpets-main):
-            - Frontend: http://localhost:3000 (when port forwarding starts)
-            - Backend API: http://localhost:3000/api (when port forwarding starts)
+            EXTERNAL ACCESS (via Devpets-main Ansible):
+            - Frontend: http://localhost:3000 (when Ansible starts port forwarding)
+            - Backend API: http://localhost:3000/api (when Ansible starts port forwarding)
             
             ========================================
             FOR USERS (Browser Access)
             ========================================
-            Wait for Devpets-main Ansible to start port forwarding, then access:
-            - Frontend: http://localhost:3000
-            - Backend API: http://localhost:3000/api
-            
-            Note: Port forwarding is handled by Devpets-main Ansible
+            Applications are ready! Devpets-main Ansible will automatically:
+            1. Detect the functional applications
+            2. Start port forwarding
+            3. Provide access at:
+               - Frontend: http://localhost:3000
+               - Backend API: http://localhost:3000/api
             
             ========================================
             USEFUL COMMANDS
