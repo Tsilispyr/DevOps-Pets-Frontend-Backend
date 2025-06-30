@@ -95,7 +95,7 @@ export default {
 
 <style scoped>
 .navbar {
-  background: #333;
+  background:rgb(32, 178, 90); 
   color: white;
   padding: 1rem;
   display: flex;
@@ -118,7 +118,7 @@ export default {
 }
 
 .nav-links a:hover {
-  background: #555;
+  background:rgb(48, 114, 10); 
 }
 
 .user-info {

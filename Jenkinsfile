@@ -356,6 +356,43 @@ EOF
                     // Apply all Kubernetes resources
                     sh '''
                         echo "Applying Kubernetes resources..."
+                        
+                        # Create nginx ConfigMap
+                        echo "Creating nginx ConfigMap..."
+                        cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: ${NAMESPACE}
+data:
+  nginx.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+
+        root /usr/share/nginx/html;
+        index index.html;
+
+        location / {
+            try_files $uri /index.html;
+        }
+
+        location /api/ {
+            proxy_pass http://backend:8080/api/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location ~* \.(?:ico|css|js|gif|jpe?g|png)$ {
+            expires 1y;
+            add_header Cache-Control "public";
+        }
+    }
+EOF
+                        
                         kubectl apply -R -f k8s/ -n ${NAMESPACE}
                         echo "OK! Resources applied"
                     '''
