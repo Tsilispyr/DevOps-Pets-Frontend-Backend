@@ -533,6 +533,19 @@ EOF
                         echo "=== Services ==="
                         kubectl get services -n ${NAMESPACE}
                         
+                        echo "=== Service Ports Information ==="
+                        echo "Internal Service Ports (within cluster):"
+                        echo "- Frontend Service: Port 80 (HTTP)"
+                        echo "- Backend Service: Port 8080 (HTTP)"
+                        echo "- PostgreSQL: Port 5432 (Database)"
+                        echo "- MailHog: Port 8025 (Web UI), Port 1025 (SMTP)"
+                        echo "- Jenkins: Port 8080 (Web UI)"
+                        echo ""
+                        echo "External Access Ports:"
+                        echo "- Ingress Controller: Port 80 (HTTP), Port 443 (HTTPS)"
+                        echo "- LoadBalancer Services: External IPs assigned by MetalLB"
+                        echo "- Kind Cluster: Uses host port mappings from kind-config.yaml"
+                        
                         echo "=== Infrastructure Services (from Devpets-main) ==="
                         kubectl get services -n devops-pets | grep -E "(postgres|mailhog|jenkins)" || echo "No infrastructure services found"
                         
@@ -552,6 +565,26 @@ EOF
                         
                         echo "=== Final Service Status ==="
                         kubectl get services -n ${NAMESPACE} -o wide
+                        
+                        echo "=== Access Information ==="
+                        echo "Internal Service Ports:"
+                        echo "- Frontend Service: Port 80 (HTTP)"
+                        echo "- Backend API Service: Port 8080 (HTTP)"
+                        echo ""
+                        echo "External Access:"
+                        echo "- Ingress: http://localhost (routes to internal services)"
+                        echo "- LoadBalancer: Check external IPs above for direct access"
+                        echo "- Kind Cluster: Uses host port mappings for external access"
+                        echo ""
+                        echo "=== FOR USERS (Browser Access) ==="
+                        echo "If Ingress is working:"
+                        echo "  Frontend: http://localhost"
+                        echo "  Backend API: http://localhost/api"
+                        echo ""
+                        echo "If Ingress failed (LoadBalancer):"
+                        echo "  Check LoadBalancer IPs above and use:"
+                        echo "  Frontend: http://<frontend-loadbalancer-ip>"
+                        echo "  Backend API: http://<backend-loadbalancer-ip>:8080"
                     '''
                 }
             }
@@ -573,15 +606,28 @@ EOF
                             kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/kind/deploy.yaml
                             
                             echo "Waiting for nginx-ingress controller to be ready..."
-                            kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=300s
+                            echo "Note: This may take a few minutes on Kind cluster..."
                             
-                            echo "✅ nginx-ingress controller installed"
+                            # Wait with longer timeout and better error handling
+                            if kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=600s; then
+                                echo "✅ nginx-ingress controller installed successfully"
+                            else
+                                echo "⚠️  nginx-ingress controller installation timed out"
+                                echo "This is common in Kind clusters. Checking status..."
+                                kubectl get pods -n ingress-nginx
+                                kubectl describe pods -n ingress-nginx -l app.kubernetes.io/component=controller
+                                
+                                echo "Continuing with LoadBalancer services instead..."
+                                echo "The application will be accessible via LoadBalancer IPs"
+                            fi
                         else
                             echo "✅ nginx-ingress controller already installed"
                         fi
                         
-                        echo "Creating Ingress resource..."
-                        cat <<EOF | kubectl apply -f -
+                        # Only create Ingress if nginx-ingress is working
+                        if kubectl get pods -n ingress-nginx -l app.kubernetes.io/component=controller --field-selector=status.phase=Running 2>/dev/null | grep -q ingress-nginx-controller; then
+                            echo "Creating Ingress resource..."
+                            cat <<EOF | kubectl apply -f -
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -611,14 +657,19 @@ spec:
             port:
               number: 8080
 EOF
-                        
-                        echo "Waiting for Ingress to be ready..."
-                        kubectl wait --for=condition=ready ingress/app-ingress -n ${NAMESPACE} --timeout=60s
-                        
-                        echo "✅ Ingress configured successfully"
-                        echo "Access your application at:"
-                        echo "- Frontend: http://localhost"
-                        echo "- Backend API: http://localhost/api"
+                            
+                            echo "Waiting for Ingress to be ready..."
+                            kubectl wait --for=condition=ready ingress/app-ingress -n ${NAMESPACE} --timeout=60s
+                            
+                            echo "✅ Ingress configured successfully"
+                            echo "Access your application at:"
+                            echo "- Frontend: http://localhost"
+                            echo "- Backend API: http://localhost/api"
+                        else
+                            echo "⚠️  nginx-ingress controller not ready, using LoadBalancer services"
+                            echo "Application will be accessible via LoadBalancer IPs"
+                            echo "Check 'kubectl get services -n devops-pets' for external IPs"
+                        fi
                     '''
                 }
             }
@@ -635,31 +686,45 @@ EOF
             DEPLOYMENT SUCCESSFUL!
             ========================================
             Applications have been built and deployed:
-            - Backend: Spring Boot JAR deployed
-            - Frontend: Vue.js build deployed with nginx proxy
+            - Backend: Spring Boot JAR deployed (Port: 8080)
+            - Frontend: Vue.js build deployed with nginx proxy (Port: 80)
             - LoadBalancer: MetalLB configured with external IPs
-            - Ingress: nginx-ingress controller configured
+            - Ingress: nginx-ingress controller configured (if available)
             
-            Access Points (FULLY AUTOMATED):
+            Access Points:
+            ========================================
+            PRIMARY ACCESS (INGRESS):
+            - Frontend: http://localhost (Port: 80)
+            - Backend API: http://localhost/api (Port: 8080)
+            
+            ALTERNATIVE ACCESS (LOADBALANCER):
+            - Check LoadBalancer IPs: kubectl get services -n devops-pets
+            - Frontend: http://<frontend-loadbalancer-ip> (Port: 80)
+            - Backend API: http://<backend-loadbalancer-ip>:8080 (Port: 8080)
+            
+            ========================================
+            FOR USERS (Browser Access)
+            ========================================
+            If Ingress is working:
             - Frontend: http://localhost
             - Backend API: http://localhost/api
-            - LoadBalancer IPs: Check with 'kubectl get services -n devops-pets'
             
-            ========================================
-            INGRESS SETUP
-            ========================================
-            Ingress controller automatically routes traffic:
-            - No manual port forwarding needed
-            - Services accessible via http://localhost
-            - Fully automated deployment and access
+            If Ingress failed (LoadBalancer):
+            - Check LoadBalancer IPs with: kubectl get services -n devops-pets
+            - Frontend: http://<frontend-loadbalancer-ip>
+            - Backend API: http://<backend-loadbalancer-ip>:8080
+            
+            Note: The LoadBalancer IPs will be shown in the service list above
             
             ========================================
             USEFUL COMMANDS
             ========================================
             - Check services: kubectl get services -n devops-pets
             - Check ingress: kubectl get ingress -n devops-pets
+            - Check ingress controller: kubectl get pods -n ingress-nginx
             - View logs: kubectl logs -n devops-pets <pod-name>
             - Check nginx config: kubectl exec -n devops-pets <frontend-pod> -- cat /etc/nginx/conf.d/default.conf
+            - Check service ports: kubectl get services -n devops-pets -o wide
             ========================================
             '''
         }
