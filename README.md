@@ -2,7 +2,7 @@
 
 ## Overview
 
-F-B-END is a comprehensive pet adoption management system consisting of a Spring Boot backend API and a Vue.js frontend application. The project includes complete CI/CD pipeline automation using Jenkins and Kubernetes deployment.
+F-B-END is a comprehensive pet adoption management system consisting of a Spring Boot backend API and a Vue.js frontend application. The project includes complete CI/CD pipeline automation using Jenkins and Kubernetes deployment with automatic ingress setup and port forwarding.
 
 ## Project Structure
 
@@ -35,7 +35,7 @@ F-B-END/
 ### Infrastructure (k8s/)
 - **Container Orchestration**: Kubernetes
 - **Load Balancing**: MetalLB LoadBalancer
-- **Ingress**: nginx-ingress-controller
+- **Ingress**: nginx-ingress-controller with automatic port forwarding
 - **Storage**: PersistentVolumeClaims for shared data
 - **Services**: LoadBalancer services for external access
 
@@ -55,18 +55,33 @@ F-B-END/
    ```
 
 2. **Application Deployment**:
-   - Access Jenkins at http://localhost:8080
+   - Access Jenkins at http://localhost:8082
    - Create new pipeline job pointing to this repository
    - Run the pipeline
-   - Access application at http://localhost
+   - Access application at http://localhost:3000
 
 ## Access Points
 
-- **Frontend Application**: URL will be shown in Jenkins pipeline output (typically http://localhost or LoadBalancer IP)
-- **Backend API**: URL will be shown in Jenkins pipeline output (typically http://localhost/api or LoadBalancer IP:8080)
-- **Jenkins**: http://localhost:8080
+- **Frontend Application**: http://localhost:3000 (via ingress with port forwarding)
+- **Backend API**: http://localhost:3000/api (via ingress with port forwarding)
+- **Jenkins**: http://localhost:8082
 - **MailHog**: http://localhost:8025
 - **PostgreSQL**: localhost:5432
+
+## Communication Flow
+
+The application uses a complete communication chain:
+
+```
+Local Browser ←→ Port Forwarding ←→ Ingress Controller ←→ Services ←→ Pods ←→ Database/Email
+   :3000              :3000:80           :80              :8080      :8080      :5432/1025
+```
+
+### Detailed Flow:
+1. **Browser** → **Port Forwarding** (localhost:3000 → ingress-controller:80)
+2. **Ingress Controller** → **Services** (routing based on URL paths)
+3. **Services** → **Pods** (service discovery and load balancing)
+4. **Pods** → **Database/Email** (internal cluster communication)
 
 ## Development
 
@@ -90,12 +105,26 @@ The application uses a microservices architecture with:
 - Shared PostgreSQL database (managed by Devpets-main)
 - Nginx reverse proxy for API routing
 - LoadBalancer services for external access
-- Ingress controller for unified access
+- Ingress controller for unified access with automatic port forwarding
+- MetalLB for LoadBalancer IP assignment
+
+## Automated Pipeline Features
+
+The Jenkins pipeline automatically:
+1. **Sets up kubeconfig** for Jenkins authentication
+2. **Installs MetalLB** LoadBalancer controller
+3. **Builds applications** (frontend and backend)
+4. **Deploys to Kubernetes** with shared storage
+5. **Installs nginx-ingress** controller
+6. **Adds ingress-ready labels** to nodes
+7. **Configures ingress routing** with regex patterns
+8. **Sets up port forwarding** on localhost:3000
+9. **Provides access URLs** to the user
 
 ## Troubleshooting
 
 ### Common Issues
-1. **Port forwarding not working**: Use LoadBalancer services instead
+1. **Port forwarding not working**: Check if ingress controller is running
 2. **Database connection errors**: Verify PostgreSQL is running in devops-pets namespace
 3. **Frontend not loading**: Check nginx configuration and ConfigMap mounting
 4. **Authentication issues**: Verify JWT configuration and database connectivity
@@ -113,6 +142,12 @@ kubectl get services -n devops-pets
 
 # Check ingress
 kubectl get ingress -n devops-pets
+
+# Check ingress controller
+kubectl get pods -n ingress-nginx
+
+# Stop port forwarding
+pkill -f "kubectl port-forward"
 ```
 
 ## Contributing

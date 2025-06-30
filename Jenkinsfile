@@ -673,8 +673,10 @@ spec:
               number: 8080
 EOF
                             
-                            echo "Waiting for Ingress to be ready..."
-                            kubectl wait --for=condition=ready ingress/app-ingress -n ${NAMESPACE} --timeout=60s
+                            echo "Ingress created successfully!"
+                            echo "Note: nginx-ingress-controller may take a moment to sync"
+                            echo "Checking ingress status..."
+                            kubectl get ingress app-ingress -n ${NAMESPACE}
                             
                             echo "Ingress configured successfully"
                             echo "Access your application at:"

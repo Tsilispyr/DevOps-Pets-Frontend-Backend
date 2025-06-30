@@ -354,7 +354,7 @@ kubectl cp <pod-name>:/path/to/file ./local-file -n devops-pets
 ### External Access
 - **Frontend Application**: Port 80 (Standard) - External IP shown in Jenkins pipeline
 - **Backend API**: Port 8080 (Standard) - External IP shown in Jenkins pipeline
-- **Jenkins**: http://localhost:8080
+- **Jenkins**: http://localhost:8082
 - **MailHog**: http://localhost:8025
 
 ### Internal Services
