@@ -334,12 +334,18 @@ spec:
           volumeMounts:
             - name: frontend-files
               mountPath: /usr/share/nginx/html
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: nginx.conf
       volumes:
         - name: frontend-files
           emptyDir: {}
         - name: shared-storage
           persistentVolumeClaim:
             claimName: shared-storage
+        - name: nginx-config
+          configMap:
+            name: nginx-config
 EOF
                     '''
                 }
@@ -375,18 +381,18 @@ data:
         index index.html;
 
         location / {
-            try_files $uri /index.html;
+            try_files \$uri \$uri/ /index.html;
         }
 
         location /api/ {
             proxy_pass http://backend:8080/api/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
         }
 
-        location ~* \\\\.(?:ico|css|js|gif|jpe?g|png)$ {
+        location ~* \\.(?:ico|css|js|gif|jpe?g|png)$ {
             expires 1y;
             add_header Cache-Control "public";
         }
@@ -471,71 +477,11 @@ EOF
             }
         }
 
-        stage('Setup Port Forwarding') {
-            steps {
-                script {
-                    echo "========================================"
-                    echo "STEP 8: SETTING UP PORT FORWARDING"
-                    echo "========================================"
-                    
-                    // Kill any existing port forwards
-                    sh '''
-                        pkill -f "kubectl port-forward.*backend" || true
-                        pkill -f "kubectl port-forward.*frontend" || true
-                        sleep 2
-                    '''
-                    
-                    // Start backend port forward
-                    sh '''
-                        echo "Starting backend port forward (30080:8080)..."
-                        kubectl port-forward -n ${NAMESPACE} service/backend 30080:8080 &
-                        BACKEND_PID=$!
-                        echo $BACKEND_PID > /tmp/backend-port-forward.pid
-                        echo "OK! Backend port forward is running (PID: $BACKEND_PID)"
-                    '''
-                    
-                    // Start frontend port forward
-                    sh '''
-                        echo "Starting frontend port forward (30000:80)..."
-                        kubectl port-forward -n ${NAMESPACE} service/frontend 30000:80 &
-                        FRONTEND_PID=$!
-                        echo $FRONTEND_PID > /tmp/frontend-port-forward.pid
-                        echo "OK! Frontend port forward is running (PID: $FRONTEND_PID)"
-                    '''
-                    
-                    // Wait for port forwards to establish
-                    sh '''
-                        echo "Waiting for port forwards to establish..."
-                        sleep 5
-                        
-                        # Check if port forwards are running
-                        if [ -f /tmp/backend-port-forward.pid ]; then
-                            BACKEND_PID=$(cat /tmp/backend-port-forward.pid)
-                            if kill -0 $BACKEND_PID 2>/dev/null; then
-                                echo "OK! Backend port forward is running"
-                            else
-                                echo "ERR! Backend port forward failed to start"
-                            fi
-                        fi
-                        
-                        if [ -f /tmp/frontend-port-forward.pid ]; then
-                            FRONTEND_PID=$(cat /tmp/frontend-port-forward.pid)
-                            if kill -0 $FRONTEND_PID 2>/dev/null; then
-                                echo "OK! Frontend port forward is running"
-                            else
-                                echo "ERR! Frontend port forward failed to start"
-                            fi
-                        fi
-                    '''
-                }
-            }
-        }
-
         stage('Verify Deployment') {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 9: VERIFYING DEPLOYMENT"
+                    echo "STEP 8: VERIFYING DEPLOYMENT"
                     echo "========================================"
                     
                     // Verify all pods are running
@@ -583,27 +529,21 @@ EOF
             ========================================
             Applications have been built and deployed:
             - Backend: Spring Boot JAR deployed
-            - Frontend: Vue.js build deployed
+            - Frontend: Vue.js build deployed with nginx proxy
             
-            Access Points:
-            - Backend API: http://localhost:30080
+            Access Points (NodePort Services):
             - Frontend App: http://localhost:30000
+            - Backend API (direct): http://localhost:30080
+            - Backend API (via nginx): http://localhost:30000/api/
             - MailHog UI: http://localhost:8025
             - PostgreSQL: localhost:5432
-            
-            ========================================
-            PORT FORWARDING STATUS
-            ========================================
-            Backend port forward: Running on localhost:30080
-            Frontend port forward: Running on localhost:30000
-            PID files: /tmp/backend-port-forward.pid, /tmp/frontend-port-forward.pid
             
             ========================================
             USEFUL COMMANDS
             ========================================
             - Check status: kubectl get all -n devops-pets
             - View logs: kubectl logs -n devops-pets <pod-name>
-            - Stop forwarding: pkill -f 'kubectl port-forward'
+            - Check nginx config: kubectl exec -n devops-pets <frontend-pod> -- cat /etc/nginx/conf.d/default.conf
             ========================================
             '''
         }
