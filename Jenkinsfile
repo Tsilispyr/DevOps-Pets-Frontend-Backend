@@ -91,11 +91,64 @@ EOF
             }
         }
 
+        stage('Setup LoadBalancer') {
+            steps {
+                script {
+                    echo "========================================"
+                    echo "STEP 2: SETTING UP LOADBALANCER"
+                    echo "========================================"
+                    
+                    // Install MetalLB LoadBalancer if not already installed
+                    sh '''
+                        echo "Checking if MetalLB LoadBalancer is installed..."
+                        
+                        if ! kubectl get namespace metallb-system 2>/dev/null; then
+                            echo "Installing MetalLB LoadBalancer..."
+                            kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/config/manifests/metallb-native.yaml
+                            
+                            echo "Waiting for MetalLB to be ready..."
+                            kubectl wait --for=condition=ready pod -l app=metallb -n metallb-system --timeout=120s
+                            
+                            echo "Configuring MetalLB IP address pool..."
+                            cat <<EOF | kubectl apply -f -
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: first-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 172.18.0.200-172.18.0.250
+EOF
+                            
+                            cat <<EOF | kubectl apply -f -
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: example
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - first-pool
+EOF
+                            
+                            echo "MetalLB LoadBalancer installed and configured"
+                        else
+                            echo "MetalLB LoadBalancer already installed"
+                        fi
+                        
+                        echo "Verifying MetalLB status..."
+                        kubectl get pods -n metallb-system
+                    '''
+                }
+            }
+        }
+
         stage('Complete Cleanup') {
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 2: COMPLETE CLEANUP"
+                    echo "STEP 3: COMPLETE CLEANUP"
                     echo "========================================"
                     
                     // Stop all port forwarding
@@ -129,7 +182,7 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 2.5: APPLYING RBAC CONFIGURATION"
+                    echo "STEP 3.5: APPLYING RBAC CONFIGURATION"
                     echo "========================================"
                     
                     // Apply RBAC configuration first
@@ -356,7 +409,7 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 7: DEPLOYING TO KUBERNETES"
+                    echo "STEP 8: DEPLOYING TO KUBERNETES"
                     echo "========================================"
                     
                     // Apply all Kubernetes resources
@@ -461,7 +514,7 @@ EOF
             steps {
                 script {
                     echo "========================================"
-                    echo "STEP 8: VERIFYING DEPLOYMENT"
+                    echo "STEP 9: VERIFYING DEPLOYMENT"
                     echo "========================================"
                     
                     // Verify all pods are running
