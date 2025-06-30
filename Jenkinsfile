@@ -629,7 +629,7 @@ EOF
                         # Wait for backend to be responding
                         echo "Waiting for backend to be responding..."
                         for i in {1..30}; do
-                          if kubectl run test-backend --image=busybox --restart=Never --rm -i --timeout=10s --namespace=${NAMESPACE} -- wget -qO- http://backend:8080/actuator/health 2>/dev/null | grep -q "UP\|status"; then
+                          if kubectl run test-backend --image=busybox --restart=Never --rm -i --timeout=10s --namespace=${NAMESPACE} -- wget -qO- http://backend:8080/actuator/health 2>/dev/null | grep -q "UP\\|status"; then
                             echo "Backend is responding correctly!"
                             break
                           else
@@ -654,7 +654,7 @@ EOF
                         # Wait for frontend to be responding
                         echo "Waiting for frontend to be responding..."
                         for i in {1..30}; do
-                          if kubectl run test-frontend --image=busybox --restart=Never --rm -i --timeout=10s --namespace=${NAMESPACE} -- wget -qO- http://frontend:80/ 2>/dev/null | grep -q "html\|app\|vite"; then
+                          if kubectl run test-frontend --image=busybox --restart=Never --rm -i --timeout=10s --namespace=${NAMESPACE} -- wget -qO- http://frontend:80/ 2>/dev/null | grep -q "html\\|app\\|vite"; then
                             echo "Frontend is responding correctly!"
                             break
                           else
