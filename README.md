@@ -62,8 +62,8 @@ F-B-END/
 
 ## Access Points
 
-- **Frontend Application**: http://localhost:3000 (via ingress with port forwarding)
-- **Backend API**: http://localhost:3000/api (via ingress with port forwarding)
+- **Frontend Application**: http://localhost:8081
+- **Backend API**: http://localhost:8080/api
 - **Jenkins**: http://localhost:8082
 - **MailHog**: http://localhost:8025
 - **PostgreSQL**: localhost:5432
@@ -161,3 +161,9 @@ pkill -f "kubectl port-forward"
 ## License
 
 This project is licensed under the MIT License.
+
+## Notes
+- The backend always listens on port 8080.
+- The frontend is exposed on port 8081 via port-forward.
+- Jenkins: http://localhost:8082
+- MailHog: http://localhost:8025
