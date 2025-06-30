@@ -363,8 +363,12 @@ EOF
                     sh '''
                         echo "Applying Kubernetes resources..."
                         
-                        # Create nginx ConfigMap
-                        echo "Creating nginx ConfigMap..."
+                        # Force delete and recreate nginx ConfigMap
+                        echo "Force deleting existing nginx ConfigMap..."
+                        kubectl delete configmap nginx-config -n ${NAMESPACE} --ignore-not-found=true
+                        
+                        # Create nginx ConfigMap with correct configuration
+                        echo "Creating nginx ConfigMap with correct configuration..."
                         cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: ConfigMap
@@ -399,8 +403,16 @@ data:
     }
 EOF
                         
+                        echo "Verifying nginx ConfigMap..."
+                        kubectl get configmap nginx-config -n ${NAMESPACE} -o yaml
+                        
                         kubectl apply -R -f k8s/ -n ${NAMESPACE}
                         echo "OK! Resources applied"
+                        
+                        # Force restart frontend deployment to pick up new ConfigMap
+                        echo "Force restarting frontend deployment..."
+                        kubectl rollout restart deployment frontend -n ${NAMESPACE}
+                        echo "OK! Frontend deployment restarted"
                     '''
                     
                     // Wait for pods to be created (not necessarily ready)
