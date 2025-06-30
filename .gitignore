@@ -63,3 +63,8 @@ target/
 *.log
 .idea/
 .vscode/
+
+# Email credentials and environment files
+.env
+*.backup
+application.properties.backup

@@ -400,6 +400,11 @@ EOF
                         kubectl apply -R -f k8s/ -n ${NAMESPACE}
                         echo "OK! Resources applied"
                         
+                        # Apply MinIO resources
+                        echo "Applying MinIO resources..."
+                        kubectl apply -f k8s/minio/ -n ${NAMESPACE}
+                        echo "OK! MinIO resources applied"
+                        
                         # Force restart frontend deployment to pick up new ConfigMap
                         echo "Force restarting frontend deployment..."
                         kubectl rollout restart deployment frontend -n ${NAMESPACE}
@@ -575,7 +580,12 @@ EOF
                         echo "- Jenkins: Port 8080 (Web UI)"
                         
                         echo "=== Infrastructure Services (from Devpets-main) ==="
-                        kubectl get services -n devops-pets | grep -E "(postgres|mailhog|jenkins)" || echo "No infrastructure services found"
+                        kubectl get services -n devops-pets | grep -E "(postgres|mailhog|jenkins|minio)" || echo "No infrastructure services found"
+                        
+                        echo "=== MinIO Status ==="
+                        kubectl get deployment minio -n ${NAMESPACE} || echo "MinIO deployment not found"
+                        kubectl get pods -l app=minio -n ${NAMESPACE} || echo "MinIO pods not found"
+                        kubectl get service minio -n ${NAMESPACE} || echo "MinIO service not found"
                     '''
                     
                     // Final verification that all deployments are ready

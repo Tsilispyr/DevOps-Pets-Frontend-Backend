@@ -36,9 +36,19 @@ spec:
             - name: SPRING_DATASOURCE_PASSWORD
               value: petpass
             - name: SPRING_MAIL_HOST
-              value: mailhog
+              value: smtp.gmail.com
             - name: SPRING_MAIL_PORT
-              value: "1025"
+              value: "587"
+            - name: SPRING_MAIL_USERNAME
+              value: "${GMAIL_USER}"
+            - name: SPRING_MAIL_PASSWORD
+              value: "${GMAIL_PASS}"
+            - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH
+              value: "true"
+            - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE
+              value: "true"
+            - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED
+              value: "true"
             - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
               value: http://localhost:8083/realms/petsystem
             - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES

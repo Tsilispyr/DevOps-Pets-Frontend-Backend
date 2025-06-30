@@ -28,6 +28,9 @@ public class Animal {
     @Column
     private Integer userId;
 
+    @Column
+    private String imageUrl;
+
     public String getName() {
         return name;
     }
@@ -75,6 +78,9 @@ public class Animal {
 
     public Integer getUserId() { return userId; }
     public void setUserId(Integer userId) { this.userId = userId; }
+
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 
     public Animal(Integer id, int age, Gender gender, String type, String name) {
         this.id = id;
