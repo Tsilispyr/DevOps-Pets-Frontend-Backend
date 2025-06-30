@@ -386,7 +386,7 @@ data:
             proxy_set_header X-Forwarded-Proto $scheme;
         }
 
-        location ~* \.(?:ico|css|js|gif|jpe?g|png)$ {
+        location ~* \\\\.(?:ico|css|js|gif|jpe?g|png)$ {
             expires 1y;
             add_header Cache-Control "public";
         }
