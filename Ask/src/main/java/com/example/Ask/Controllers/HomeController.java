@@ -19,4 +19,14 @@ public class HomeController {
         response.put("title", "Home");
         return response;
     }
+
+    @GetMapping("/api/test")
+    public String test() {
+        return "Test endpoint working!";
+    }
+
+    @GetMapping("/api/health")
+    public String health() {
+        return "Backend is healthy!";
+    }
 }

@@ -50,6 +50,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/test").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/animals/Deny/{id}").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/user/role/add/**").authenticated()
                         .requestMatchers("/actuator/health/**").permitAll()
