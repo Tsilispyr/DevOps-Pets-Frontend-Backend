@@ -14,10 +14,10 @@ public class MinioConfig {
     @Value("${minio.accessKey:minioadmin}")
     private String accessKey;
 
-    @Value("${minio.secretKey:minioadmin123}")
+    @Value("${minio.secretKey:minioadmin}")
     private String secretKey;
 
-    @Value("${minio.bucket:pets-images}")
+    @Value("${minio.bucket:pet-images}")
     private String bucket;
 
     @Bean
@@ -30,5 +30,17 @@ public class MinioConfig {
 
     public String getBucket() {
         return bucket;
+    }
+
+    public String getEndpoint() {
+        return endpoint;
+    }
+
+    public String getAccessKey() {
+        return accessKey;
+    }
+
+    public String getSecretKey() {
+        return secretKey;
     }
 } 

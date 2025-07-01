@@ -48,7 +48,7 @@ public class FileUploadController {
             String imageUrl = fileStorageService.uploadImage(file);
             
             // Update animal record with image URL
-            Animal animal = animalService.getAnimalById(animalId);
+            Animal animal = animalService.getAnimal(animalId);
             if (animal != null) {
                 animal.setImageUrl(imageUrl);
                 animalService.saveAnimal(animal);
