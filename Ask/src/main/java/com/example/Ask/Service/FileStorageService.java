@@ -1,5 +1,6 @@
 package com.example.Ask.Service;
 
+import com.example.Ask.config.MinioConfig;
 import io.minio.*;
 import io.minio.http.Method;
 import org.springframework.beans.factory.annotation.Autowired;
