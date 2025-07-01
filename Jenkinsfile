@@ -296,9 +296,13 @@ spec:
             - name: SPRING_DATASOURCE_PASSWORD
               value: petpass
             - name: SPRING_MAIL_HOST
-              value: mailhog
+              value: smtp.gmail.com
             - name: SPRING_MAIL_PORT
-              value: "1025"
+              value: "587"
+            - name: GMAIL_USER
+              value: "${GMAIL_USER}"
+            - name: GMAIL_PASS
+              value: "${GMAIL_PASS}"
             - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
               value: http://localhost:8083/realms/petsystem
             - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES
@@ -404,6 +408,12 @@ EOF
                         echo "Applying MinIO resources..."
                         kubectl apply -f k8s/minio/ -n ${NAMESPACE}
                         echo "OK! MinIO resources applied"
+                        
+                        # Wait for MinIO to be ready
+                        echo "Waiting for MinIO to be ready..."
+                        kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/minio -n ${NAMESPACE}
+                        kubectl wait --for=condition=ready pod -l app=minio -n ${NAMESPACE} --timeout=${TIMEOUT}
+                        echo "OK! MinIO is ready"
                         
                         # Force restart frontend deployment to pick up new ConfigMap
                         echo "Force restarting frontend deployment..."
@@ -594,6 +604,7 @@ EOF
                         
                         kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/backend -n ${NAMESPACE}
                         kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/frontend -n ${NAMESPACE}
+                        kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/minio -n ${NAMESPACE}
                         
                         echo "OK! All deployments are fully ready"
                         
@@ -683,6 +694,7 @@ EOF
                         echo "========================================"
                         echo "Backend: Ready and responding"
                         echo "Frontend: Ready and responding"
+                        echo "MinIO: Ready for file storage"
                         echo ""
                         echo "Devpets-main Ansible will now detect these applications"
                         echo "and start port forwarding automatically."
