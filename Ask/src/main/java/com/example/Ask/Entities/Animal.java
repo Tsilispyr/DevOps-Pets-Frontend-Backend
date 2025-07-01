@@ -28,7 +28,7 @@ public class Animal {
     @Column
     private Integer userId;
 
-    @Column
+    @Column(columnDefinition = "TEXT")
     private String imageUrl;
 
     public String getName() {
