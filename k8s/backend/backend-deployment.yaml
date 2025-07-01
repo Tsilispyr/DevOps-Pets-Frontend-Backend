@@ -39,16 +39,6 @@ spec:
               value: smtp.gmail.com
             - name: SPRING_MAIL_PORT
               value: "587"
-            - name: SPRING_MAIL_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: gmail-secret
-                  key: GMAIL_USER
-            - name: SPRING_MAIL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: gmail-secret
-                  key: GMAIL_PASS
             - name: GMAIL_USER
               valueFrom:
                 secretKeyRef:
