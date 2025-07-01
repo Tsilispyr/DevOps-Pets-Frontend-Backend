@@ -40,9 +40,15 @@ spec:
             - name: SPRING_MAIL_PORT
               value: "587"
             - name: SPRING_MAIL_USERNAME
-              value: "${GMAIL_USER}"
+              valueFrom:
+                secretKeyRef:
+                  name: gmail-secret
+                  key: GMAIL_USER
             - name: SPRING_MAIL_PASSWORD
-              value: "${GMAIL_PASS}"
+              valueFrom:
+                secretKeyRef:
+                  name: gmail-secret
+                  key: GMAIL_PASS
             - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH
               value: "true"
             - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE
