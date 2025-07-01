@@ -24,6 +24,7 @@ public class FileUploadController {
 
     @PostMapping("/upload")
     public ResponseEntity<Map<String, String>> uploadFile(@RequestParam("file") MultipartFile file) {
+        System.out.println("UPLOAD: /upload endpoint called, file=" + (file != null ? file.getOriginalFilename() : "null"));
         try {
             String imageUrl = fileStorageService.uploadImage(file);
             
@@ -43,6 +44,7 @@ public class FileUploadController {
     public ResponseEntity<Map<String, String>> uploadAnimalImage(
             @PathVariable Integer animalId,
             @RequestParam("file") MultipartFile file) {
+        System.out.println("UPLOAD: /upload-animal-image endpoint called, animalId=" + animalId + ", file=" + (file != null ? file.getOriginalFilename() : "null"));
         try {
             // Upload image to MinIO
             String imageUrl = fileStorageService.uploadImage(file);

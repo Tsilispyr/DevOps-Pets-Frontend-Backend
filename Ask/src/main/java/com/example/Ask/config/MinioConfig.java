@@ -22,6 +22,8 @@ public class MinioConfig {
 
     @Bean
     public MinioClient minioClient() {
+        System.out.println("MinIO Access Key: " + accessKey);
+        System.out.println("MinIO Secret Key: " + secretKey);
         return MinioClient.builder()
                 .endpoint(endpoint)
                 .credentials(accessKey, secretKey)

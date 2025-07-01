@@ -22,6 +22,9 @@ public class FileStorageService {
 
     public String uploadImage(MultipartFile file) {
         try {
+            // Log MinIO credentials
+            System.out.println("MinIO Access Key (upload): " + minioConfig.getAccessKey());
+            System.out.println("MinIO Secret Key (upload): " + minioConfig.getSecretKey());
             // Generate unique filename
             String originalFilename = file.getOriginalFilename();
             String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
