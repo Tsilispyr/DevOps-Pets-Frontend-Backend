@@ -300,9 +300,15 @@ spec:
             - name: SPRING_MAIL_PORT
               value: "587"
             - name: GMAIL_USER
-              value: "${GMAIL_USER}"
+              valueFrom:
+                secretKeyRef:
+                  name: gmail-secret
+                  key: GMAIL_USER
             - name: GMAIL_PASS
-              value: "${GMAIL_PASS}"
+              valueFrom:
+                secretKeyRef:
+                  name: gmail-secret
+                  key: GMAIL_PASS
             - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
               value: http://localhost:8083/realms/petsystem
             - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES
