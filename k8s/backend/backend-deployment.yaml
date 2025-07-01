@@ -49,6 +49,16 @@ spec:
                 secretKeyRef:
                   name: gmail-secret
                   key: GMAIL_PASS
+            - name: GMAIL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: gmail-secret
+                  key: GMAIL_USER
+            - name: GMAIL_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: gmail-secret
+                  key: GMAIL_PASS
             - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH
               value: "true"
             - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE
