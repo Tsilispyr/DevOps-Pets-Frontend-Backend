@@ -1,3 +1,4 @@
+version: '3.8'
 services:
   postgres:
     image: postgres:15
@@ -30,21 +31,45 @@ services:
       - keycloak_data:/opt/keycloak/data
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
 
-  # backend:
-  #   build:
-  #     context: ./Exercise_Ask_Kat/Ask
-  #     dockerfile: Dockerfile
-  #   container_name: backend
-  #   depends_on:
-  #     - keycloak
-  #     - postgres
-  #   ports:
-  #     - "8080:8080"
-  #   environment:
-  #     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/petdb
-  #     SPRING_DATASOURCE_USERNAME: petuser
-  #     SPRING_DATASOURCE_PASSWORD: petpass
-  #     SPRING_JPA_HIBERNATE_DDL_AUTO: update
+  backend:
+    build:
+      context: ./Ask
+      dockerfile: Dockerfile
+    container_name: backend
+    depends_on:
+      - keycloak
+      - postgres
+      - minio
+      - mailhog
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/petdb
+      SPRING_DATASOURCE_USERNAME: petuser
+      SPRING_DATASOURCE_PASSWORD: petpass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      GMAIL_USER: your_gmail@gmail.com
+      GMAIL_PASS: your_gmail_app_password
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+      MINIO_BUCKET: pets-images
+    volumes:
+      - ./Ask:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    depends_on:
+      - backend
+    ports:
+      - "8083:80"
+    environment:
+      VITE_API_URL: http://localhost:8080
+    volumes:
+      - ./frontend:/app
 
   mailhog:
     image: mailhog/mailhog
@@ -52,7 +77,7 @@ services:
     ports:
       - "8025:8025"
       - "1025:1025"
-   
+
   jenkins:
     image: jenkins/jenkins:lts
     container_name: jenkins
@@ -67,9 +92,22 @@ services:
     environment:
       JAVA_OPTS: -Djenkins.install.runSetupWizard=false
 
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
 
 volumes:
-  db-data:  {}
-  jenkins_home:  {}
-  keycloak_data:  {}
+  db-data: {}
+  jenkins_home: {}
+  keycloak_data: {}
+  minio-data: {}
        

@@ -17,7 +17,7 @@ public class MinioConfig {
     @Value("${minio.secretKey:minioadmin}")
     private String secretKey;
 
-    @Value("${minio.bucket:pet-images}")
+    @Value("${minio.bucket:pets-images}")
     private String bucket;
 
     @Bean
