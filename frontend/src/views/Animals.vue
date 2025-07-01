@@ -5,7 +5,9 @@
     <div v-if="animals.length === 0">Κανένα ζώο διαθέσιμο.</div>
     <ul v-else>
       <li v-for="a in animals" :key="a.id" class="animal-card">
-        <img :src="a.imageUrl || defaultImage" alt="Εικόνα ζώου" style="max-width:120px;max-height:120px;object-fit:cover;margin-bottom:8px;" />
+        <div class="animal-image-box">
+          <img :src="a.imageUrl || defaultImage" alt="Εικόνα ζώου" />
+        </div>
         <h3>{{ a.name }}</h3>
         <p>Είδος: {{ a.type }}</p>
         <p>Φύλο: {{ a.gender }}</p>
@@ -39,7 +41,7 @@ function parseJwt(token) {
 
 export default {
   data() {
-    return { animals: [], defaultImage: require('../assets/vue.svg') }
+    return { animals: [], defaultImage: 'https://ids.si.edu/ids/deliveryService?id=NZP-20180807-159SB&max_w=800' }
   },
   mounted() {
     fetch('http://localhost:8080/api/animals', {
@@ -106,5 +108,24 @@ export default {
   padding: 10px;
   margin-bottom: 15px;
   border-radius: 8px;
+}
+
+.animal-image-box {
+  width: 120px;
+  height: 120px;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px auto;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.animal-image-box img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: cover;
+  display: block;
 }
 </style>
