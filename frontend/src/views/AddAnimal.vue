@@ -21,6 +21,10 @@
         <label>Ηλικία:</label>
         <input v-model="animal.age" type="number" min="0" required />
       </div>
+      <div>
+        <label>Εικόνα:</label>
+        <input type="file" @change="onFileChange" accept="image/*" />
+      </div>
       <button type="submit">Προσθήκη</button>
       <button type="button" @click="$router.back()">Ακύρωση</button>
     </form>
@@ -28,27 +32,35 @@
 </template>
 
 <script>
+import api from '../api';
 export default {
   data() {
     return {
-      animal: { name: '', type: '', gender: 'Male', age: 0 }
+      animal: { name: '', type: '', gender: 'Male', age: 0 },
+      imageFile: null
     }
   },
   methods: {
-    addAnimal() {
-      fetch('http://localhost:8080/api/animals', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('jwt_token')}`
-        },
-        body: JSON.stringify(this.animal)
-      })
-        .then(r => {
-          if (!r.ok) throw new Error('Σφάλμα προσθήκης ζώου')
-          this.$router.push('/animals')
-        })
-        .catch(() => alert('Σφάλμα προσθήκης ζώου'))
+    onFileChange(e) {
+      this.imageFile = e.target.files[0];
+    },
+    async addAnimal() {
+      try {
+        // 1. Δημιουργία ζώου
+        const res = await api.post('/animals', this.animal);
+        const animalId = res.data.id || res.data.animalId || res.data;
+        // 2. Αν υπάρχει εικόνα, κάνε upload
+        if (this.imageFile && animalId) {
+          const formData = new FormData();
+          formData.append('file', this.imageFile);
+          await api.post(`/files/upload-animal-image/${animalId}`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+        }
+        this.$router.push('/animals');
+      } catch (e) {
+        alert('Σφάλμα προσθήκης ζώου');
+      }
     }
   }
 }

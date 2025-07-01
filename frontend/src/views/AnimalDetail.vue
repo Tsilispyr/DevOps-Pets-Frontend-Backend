@@ -1,5 +1,6 @@
 <template>
   <div v-if="animal">
+    <img :src="animal.imageUrl || defaultImage" alt="Εικόνα ζώου" style="max-width:200px;max-height:200px;object-fit:cover;margin-bottom:12px;" />
     <h2>Λεπτομέρειες Ζώου</h2>
     <p><strong>Όνομα:</strong> {{ animal.name }}</p>
     <p><strong>Είδος:</strong> {{ animal.type }}</p>
@@ -13,10 +14,12 @@
 </template>
 <script>
 import api from '../api';
+import defaultImage from '../assets/vue.svg';
 export default {
   data() {
     return {
-      animal: null
+      animal: null,
+      defaultImage
     };
   },
   async mounted() {

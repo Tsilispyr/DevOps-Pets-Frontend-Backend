@@ -5,6 +5,7 @@
     <div v-if="animals.length === 0">Κανένα ζώο διαθέσιμο.</div>
     <ul v-else>
       <li v-for="a in animals" :key="a.id" class="animal-card">
+        <img :src="a.imageUrl || defaultImage" alt="Εικόνα ζώου" style="max-width:120px;max-height:120px;object-fit:cover;margin-bottom:8px;" />
         <h3>{{ a.name }}</h3>
         <p>Είδος: {{ a.type }}</p>
         <p>Φύλο: {{ a.gender }}</p>
@@ -38,7 +39,7 @@ function parseJwt(token) {
 
 export default {
   data() {
-    return { animals: [] }
+    return { animals: [], defaultImage: require('../assets/vue.svg') }
   },
   mounted() {
     fetch('http://localhost:8080/api/animals', {
