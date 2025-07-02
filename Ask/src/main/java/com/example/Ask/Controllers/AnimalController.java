@@ -34,7 +34,7 @@ public class AnimalController {
 
     @RequestMapping("")
     public List<Animal> showAnimals() {
-        return animalservice.getAnimals();
+        return animalservice.getAnimalsWithPresignedUrls();
     }
 
     @GetMapping("/{id}")

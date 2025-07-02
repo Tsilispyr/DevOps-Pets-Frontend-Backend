@@ -6,12 +6,16 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 import com.example.Ask.Entities.Animal;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.example.Ask.Service.FileStorageService;
 
 
 @Service
 public class AnimalService {
     private AnimalRepository AnimalRepo;
     private AnimalService animalservice;
+    @Autowired
+    private FileStorageService fileStorageService;
     public AnimalService(AnimalRepository AnimalRepo) {
         this.AnimalRepo = AnimalRepo;
         this.animalservice = this;
@@ -43,7 +47,19 @@ public class AnimalService {
         AnimalRepo.deleteById(id);
     }
 
-
+    /**
+     * Επιστρέφει λίστα Animal με ενημερωμένο imageUrl (presigned URL) αν είναι filename
+     */
+    @Transactional
+    public List<Animal> getAnimalsWithPresignedUrls() {
+        List<Animal> animals = AnimalRepo.findAll();
+        for (Animal animal : animals) {
+            if (animal.getImageUrl() != null && !animal.getImageUrl().startsWith("http")) {
+                String presignedUrl = fileStorageService.generatePublicUrl(animal.getImageUrl());
+                animal.setImageUrl(presignedUrl);
+            }
+        }
+        return animals;
     }
 
 
