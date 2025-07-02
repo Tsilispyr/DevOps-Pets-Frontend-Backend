@@ -1,158 +1,162 @@
-# Jenkins Setup Guide
+# Οδηγός Ρύθμισης Jenkins
 
-This guide explains how to set up and run the Jenkins pipeline for the DevPets application.
+Αυτός ο οδηγός εξηγεί πώς να ρυθμίσετε και να εκτελέσετε το pipeline Jenkins για την εφαρμογή DevPets.
 
-## Prerequisites
+## Προαπαιτούμενα
 
-1. **Devpets-main Infrastructure**: Ensure the Devpets-main project has been deployed first
-   - Jenkins should be running on http://localhost:8082
-   - Kubernetes cluster (kind) should be running with namespace `devops-pets`
-   - PostgreSQL and MailHog should be deployed in the cluster
+1. **Υποδομή Devpets-main**: Βεβαιωθείτε ότι το Devpets-main έχει αναπτυχθεί πρώτα
+   - Το Jenkins πρέπει να τρέχει στο https://pet-system-devpets.swedencentral.cloudapp.azure.com
+   - Το Kubernetes cluster (kind ή cloud) να είναι ενεργό με namespace `devops-pets`
+   - PostgreSQL και MailHog να έχουν αναπτυχθεί στο cluster
 
-2. **Jenkins Tools**: The following tools should be available in Jenkins:
+2. **Εργαλεία Jenkins**: Τα παρακάτω εργαλεία πρέπει να είναι διαθέσιμα στο Jenkins:
    - Maven 3.9.5
-   - Node.js (for npm commands)
-   - kubectl (for Kubernetes operations)
+   - Node.js (για npm)
+   - kubectl (για Kubernetes)
 
-## Jenkins Pipeline Configuration
+## Ρύθμιση Pipeline Jenkins
 
-### 1. Create New Pipeline Job
+### 1. Δημιουργία Νέου Pipeline Job
 
-1. Go to Jenkins UI: http://localhost:8082
-2. Click "New Item"
-3. Enter job name: `Devpets`
-4. Select "Pipeline"
-5. Click "OK"
+1. Μεταβείτε στο Jenkins UI: https://pet-system-devpets.swedencentral.cloudapp.azure.com
+2. Κάντε κλικ στο "New Item"
+3. Δώστε όνομα: `Devpets`
+4. Επιλέξτε "Pipeline"
+5. Κλικ "OK"
 
-### 2. Configure Pipeline
+### 2. Ρύθμιση Pipeline
 
-1. **General Settings**:
-   - Check "Discard old builds" (keep last 10 builds)
+1. **Γενικές Ρυθμίσεις**:
+   - Επιλέξτε "Discard old builds" (κρατήστε τα τελευταία 10 builds)
 
 2. **Pipeline Definition**:
-   - Select "Pipeline script from SCM"
+   - Επιλέξτε "Pipeline script from SCM"
    - SCM: Git
-   - Repository URL: Your repository URL
-   - Branch: `*/main` (or your default branch)
+   - Repository URL: Το URL του repository σας
+   - Branch: `*/main` (ή το default branch σας)
    - Script Path: `Jenkinsfile`
 
 3. **Build Triggers**:
-   - Poll SCM: `H/5 * * * *` (every 5 minutes)
-   - Or use webhooks for automatic builds
+   - Poll SCM: `H/5 * * * *` (κάθε 5 λεπτά)
+   - Ή χρησιμοποιήστε webhooks για αυτόματα builds
 
-### 3. Save and Run
+### 3. Αποθήκευση και Εκτέλεση
 
-1. Click "Save"
-2. Click "Build Now" to test the pipeline
+1. Κλικ "Save"
+2. Κλικ "Build Now" για δοκιμή του pipeline
 
-## Pipeline Flow
+## Ροή Pipeline
 
-The simplified pipeline performs the following steps:
+Το pipeline εκτελεί τα εξής βήματα:
 
-### 1. Complete Cleanup
-- Stops existing port forwarding
-- Deletes old deployments and services
-- Cleans up orphaned pods
+### 1. Πλήρες Cleanup
+- Σταματά υπάρχοντα port forwarding
+- Διαγράφει παλιά deployments και services
+- Καθαρίζει orphaned pods
 
-### 2. Build Applications
-- **Backend**: Compiles Spring Boot JAR using Maven
-- **Frontend**: Builds Vue.js application using npm
+### 2. Build Εφαρμογών
+- **Backend**: Κάνει compile το Spring Boot JAR με Maven
+- **Frontend**: Κάνει build το Vue.js app με npm
 
-### 3. Prepare Files
-- Copies JAR file to target directory
-- Verifies frontend build output
+### 3. Προετοιμασία Αρχείων
+- Αντιγράφει το JAR στο target directory
+- Επαληθεύει το build του frontend
 
-### 4. Update Manifests
-- Updates Kubernetes manifests to use hostPath volumes
-- Backend: Uses openjdk:17-jdk-slim image with JAR mounted
-- Frontend: Uses nginx:stable-alpine image with dist files mounted
+### 4. Ενημέρωση Manifests
+- Ενημερώνει τα Kubernetes manifests για χρήση hostPath volumes
+- Backend: Χρήση openjdk:17-jdk-slim image με mounted JAR
+- Frontend: Χρήση nginx:stable-alpine image με mounted dist
 
-### 5. Deploy to Kubernetes
-- Applies all Kubernetes manifests
-- Waits for deployments to be ready
-- Verifies all pods are running
+### 5. Ανάπτυξη στο Kubernetes
+- Εφαρμόζει όλα τα Kubernetes manifests
+- Περιμένει να είναι έτοιμα τα deployments
+- Επαληθεύει ότι όλα τα pods τρέχουν
 
-### 6. Setup Port Forwarding
-- Establishes port forwards for local access:
-  - Backend: localhost:30080 → 8080
-  - Frontend: localhost:30000 → 80
+### 6. Ρύθμιση Port Forwarding (μόνο για τοπική ανάπτυξη)
+- Backend: localhost:30080 → 8080
+- Frontend: localhost:30000 → 80
 
-### 7. Verify Deployment
-- Checks all services are running
-- Verifies infrastructure services
-- Confirms deployment success
+### 7. Επαλήθευση Ανάπτυξης
+- Ελέγχει ότι όλα τα services τρέχουν
+- Επαληθεύει τις υποδομές
+- Επιβεβαιώνει την επιτυχία του deployment
 
-## Access Points
+## Σημεία Πρόσβασης
 
-After successful deployment:
+Μετά από επιτυχή ανάπτυξη:
 
-- **Frontend Application**: http://localhost:30000
-- **Backend API**: http://localhost:30080
+- **Frontend**: https://pet-system-devpets.swedencentral.cloudapp.azure.com
+- **Backend API**: https://pet-system-devpets.swedencentral.cloudapp.azure.com/api
 - **MailHog UI**: http://localhost:8025
-- **PostgreSQL**: localhost:5432
-- **Jenkins**: http://localhost:8082
+- **PostgreSQL**: localhost:5432 (μόνο internal)
+- **Jenkins**: https://pet-system-devpets.swedencentral.cloudapp.azure.com
 
-## Troubleshooting
+## Επίλυση Προβλημάτων
 
-### Common Issues
+### Συχνά Προβλήματα
 
-1. **Build Failures**:
-   - Check if Maven and Node.js are available in Jenkins
-   - Verify Java version compatibility (Java 17)
-   - Check build logs for specific errors
+1. **Αποτυχία Build**:
+   - Ελέγξτε αν Maven και Node.js υπάρχουν στο Jenkins
+   - Επαληθεύστε τη συμβατότητα Java (Java 17)
+   - Ελέγξτε τα build logs για σφάλματα
 
-2. **Deployment Failures**:
-   - Ensure kubectl is configured correctly
-   - Verify the `devops-pets` namespace exists
-   - Check if infrastructure services are running
+2. **Αποτυχία Ανάπτυξης**:
+   - Βεβαιωθείτε ότι το kubectl είναι σωστά ρυθμισμένο
+   - Ελέγξτε αν υπάρχει το namespace `devops-pets`
+   - Ελέγξτε αν οι υπηρεσίες υποδομής τρέχουν
 
-3. **Port Forwarding Issues**:
-   - Check if ports 30000/30080 are available
-   - Verify port forwarding processes are running
-   - Restart port forwarding if needed
+3. **Προβλήματα Port Forwarding** (μόνο τοπικά):
+   - Ελέγξτε αν οι θύρες 30000/30080 είναι διαθέσιμες
+   - Επαληθεύστε ότι τα port forwarding processes τρέχουν
+   - Επανεκκινήστε το port forwarding αν χρειάζεται
 
-### Useful Commands
+### Χρήσιμες Εντολές
 
 ```bash
-# Check Jenkins tools
+# Έλεγχος εργαλείων Jenkins
 which mvn
 which node
 which kubectl
 
-# Check cluster status
+# Έλεγχος cluster
 kubectl cluster-info
 kubectl get nodes
 
-# Check namespace
+# Έλεγχος namespace
 kubectl get namespace devops-pets
 
-# Check all resources
+# Έλεγχος όλων των πόρων
 kubectl get all -n devops-pets
 
-# View logs
+# Προβολή logs
 kubectl logs -n devops-pets <pod-name>
 
-# Stop port forwarding
+# Σταμάτημα port forwarding
 pkill -f 'kubectl port-forward'
 ```
 
-### Log Locations
+### Τοποθεσίες Logs
 
-- **Jenkins Build Logs**: Available in Jenkins UI
+- **Jenkins Build Logs**: Μέσα από το Jenkins UI
 - **Application Logs**: `kubectl logs -n devops-pets <pod-name>`
-- **System Logs**: Check Jenkins container logs
+- **System Logs**: Jenkins container logs
 
-## Notes
+## Σημειώσεις
 
-- The pipeline uses hostPath volumes instead of Docker images
-- No Docker registry is required
-- Standard images (openjdk, nginx) are pulled from Docker Hub
-- Port forwarding is managed automatically by the pipeline
-- All infrastructure dependencies are provided by Devpets-main
+- Το pipeline χρησιμοποιεί hostPath volumes αντί για Docker images
+- Δεν απαιτείται Docker registry
+- Standard images (openjdk, nginx) κατεβαίνουν από Docker Hub
+- Το port forwarding διαχειρίζεται αυτόματα από το pipeline (μόνο τοπικά)
+- Όλες οι υποδομές παρέχονται από το Devpets-main
 
-## Security Considerations
+## Θέματα Ασφαλείας
 
-- The pipeline runs with Jenkins user permissions
-- hostPath volumes mount Jenkins workspace directories
-- Port forwarding exposes services on localhost only
-- No external registry or image pushing required 
+- Το pipeline τρέχει με δικαιώματα χρήστη Jenkins
+- Τα hostPath volumes κάνουν mount directories του workspace Jenkins
+- Το port forwarding εκθέτει υπηρεσίες μόνο στο localhost
+- Δεν απαιτείται εξωτερικό registry ή push images
+
+---
+
+**Cloud/HTTPS Σημείωση:**
+Για cloud περιβάλλον, η πρόσβαση γίνεται μέσω HTTPS και Ingress controller με cert-manager για αυτόματη έκδοση SSL certificates. 

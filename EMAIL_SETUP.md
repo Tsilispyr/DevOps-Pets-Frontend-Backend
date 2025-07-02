@@ -1,26 +1,26 @@
-# Email Service Setup Guide
+# Οδηγός Ρύθμισης Υπηρεσίας Email
 
-This guide explains how to configure the Pet Adoption System to send real emails instead of using MailHog for testing.
+Αυτός ο οδηγός εξηγεί πώς να ρυθμίσετε το Σύστημα Υιοθεσίας Κατοικιδίων ώστε να στέλνει πραγματικά emails αντί για χρήση του MailHog για δοκιμές.
 
-## Prerequisites
+## Προαπαιτούμενα
 
-1. **Gmail Account with 2-Step Verification Enabled**
-   - You need a Gmail account
-   - 2-Step Verification must be enabled on your Google account
-   - This is required to generate App Passwords
+1. **Λογαριασμός Gmail με ενεργοποιημένο 2-Step Verification**
+   - Απαιτείται λογαριασμός Gmail
+   - Πρέπει να είναι ενεργοποιημένο το 2-Step Verification
+   - Αυτό απαιτείται για τη δημιουργία App Passwords
 
-## Option 1: Direct Configuration (Simple)
+## Επιλογή 1: Άμεση Ρύθμιση (Απλή)
 
-### Step 1: Create Gmail App Password
+### Βήμα 1: Δημιουργία App Password στο Gmail
 
-1. Go to [Google App Passwords](https://myaccount.google.com/apppasswords)
-2. Sign in with your Gmail account
-3. Select "Mail" and "Other (Custom name)"
-4. Enter a name like "Pet Adoption System"
-5. Click "Generate"
-6. Copy the 16-character password (without spaces)
+1. Μεταβείτε στη σελίδα [Google App Passwords](https://myaccount.google.com/apppasswords)
+2. Συνδεθείτε με τον λογαριασμό σας
+3. Επιλέξτε "Mail" και "Other (Custom name)"
+4. Δώστε ένα όνομα π.χ. "Pet Adoption System"
+5. Πατήστε "Generate"
+6. Αντιγράψτε τον 16-ψήφιο κωδικό (χωρίς κενά)
 
-### Step 2: Run Setup Script
+### Βήμα 2: Εκτέλεση Script Ρύθμισης
 
 ```bash
 cd F-B-END
@@ -28,24 +28,23 @@ chmod +x setup-email.sh
 ./setup-email.sh
 ```
 
-The script will:
-- Ask for your Gmail address and App Password
-- Update `application.properties` with your credentials
-- Create a backup of the original configuration
+Το script θα:
+- Ζητήσει το Gmail και το App Password
+- Ενημερώσει το `application.properties` με τα στοιχεία σας
+- Δημιουργήσει backup του αρχικού αρχείου
 
-### Step 3: Test the Email Service
+### Βήμα 3: Τεστ Υπηρεσίας Email
 
-1. Start your Spring Boot application
-2. Register a new user with a real email address
-3. Check if you receive the verification email
+1. Εκκινήστε το Spring Boot application
+2. Κάντε εγγραφή νέου χρήστη με πραγματικό email
+3. Ελέγξτε αν λάβατε email επιβεβαίωσης
 
-## Option 2: Environment Variables (Recommended for Security)
+## Επιλογή 2: Μεταβλητές Περιβάλλοντος (Συνιστάται για Ασφάλεια)
 
-### Step 1: Create Gmail App Password
+### Βήμα 1: Δημιουργία App Password στο Gmail
+Όπως και στην Επιλογή 1.
 
-Same as Option 1.
-
-### Step 2: Run Environment Setup Script
+### Βήμα 2: Εκτέλεση Script Ρύθμισης Περιβάλλοντος
 
 ```bash
 cd F-B-END
@@ -53,89 +52,81 @@ chmod +x setup-email-env.sh
 ./setup-email-env.sh
 ```
 
-The script will:
-- Ask for your Gmail address and App Password
-- Update `application.properties` to use environment variables
-- Create a `.env` file with your credentials
-- Create a convenient `run-with-email.sh` script
+Το script θα:
+- Ζητήσει το Gmail και το App Password
+- Ενημερώσει το `application.properties` ώστε να χρησιμοποιεί μεταβλητές περιβάλλοντος
+- Δημιουργήσει αρχείο `.env` με τα στοιχεία σας
+- Δημιουργήσει script `run-with-email.sh`
 
-### Step 3: Run Application with Email Support
+### Βήμα 3: Εκκίνηση Εφαρμογής με Email
 
 ```bash
 ./run-with-email.sh
 ```
 
-Or manually:
+Ή χειροκίνητα:
 ```bash
 source .env
 ./mvnw spring-boot:run
 ```
 
-## Configuration Details
-
-### SMTP Settings (Gmail)
+## Ρυθμίσεις SMTP (Gmail)
 - **Host:** smtp.gmail.com
 - **Port:** 587
-- **Authentication:** Enabled
-- **TLS:** Enabled
+- **Authentication:** Ενεργό
+- **TLS:** Ενεργό
 - **Connection Timeout:** 5000ms
 - **Read Timeout:** 5000ms
 - **Write Timeout:** 5000ms
 
-### Email Templates
+## Templates Email
+- **Email Επιβεβαίωσης**: Κατά την εγγραφή
+- **Email Καλωσορίσματος**: Μετά την επιβεβαίωση
+- **Ειδοποίηση Εισόδου**: Σε νέα είσοδο (αν είναι ενεργό)
 
-The system includes several email templates:
-- **Verification Email:** Sent when users register
-- **Welcome Email:** Sent after email verification
-- **Login Notification:** Sent on new login (if enabled)
+## Σημειώσεις Ασφαλείας
 
-## Security Notes
+### Επιλογή 1 (Άμεση Ρύθμιση)
+- ✅ Απλή ρύθμιση
+- ❌ Τα credentials αποθηκεύονται στο `application.properties`
+- ❌ Τα credentials φαίνονται στον κώδικα
 
-### Option 1 (Direct Configuration)
-- ✅ Simple to set up
-- ❌ Credentials stored in `application.properties`
-- ❌ Credentials visible in source code
+### Επιλογή 2 (Μεταβλητές Περιβάλλοντος)
+- ✅ Πιο ασφαλές
+- ✅ Τα credentials δεν είναι στον κώδικα
+- ✅ Το `.env` αγνοείται από το Git
+- ❌ Λίγο πιο σύνθετη ρύθμιση
 
-### Option 2 (Environment Variables)
-- ✅ More secure
-- ✅ Credentials not in source code
-- ✅ `.env` file is ignored by Git
-- ❌ Slightly more complex setup
+## Επίλυση Προβλημάτων
 
-## Troubleshooting
-
-### Common Issues
+### Συχνά Προβλήματα
 
 1. **"Authentication failed"**
-   - Ensure 2-Step Verification is enabled
-   - Verify App Password is correct (16 characters)
-   - Check if Gmail account is not locked
+   - Βεβαιωθείτε ότι το 2-Step Verification είναι ενεργό
+   - Ελέγξτε το App Password (16 χαρακτήρες)
+   - Ελέγξτε αν ο λογαριασμός Gmail δεν είναι κλειδωμένος
 
 2. **"Connection timeout"**
-   - Check internet connection
-   - Verify firewall settings
-   - Try different network
+   - Ελέγξτε τη σύνδεση στο internet
+   - Ελέγξτε τα firewall settings
+   - Δοκιμάστε άλλο δίκτυο
 
 3. **"Invalid username or password"**
-   - Use App Password, not your regular Gmail password
-   - Ensure no extra spaces in the password
+   - Χρησιμοποιήστε App Password, όχι το κανονικό password
+   - Ελέγξτε για κενά/λάθη στον κωδικό
 
-### Testing Email Service
+### Τεστ Υπηρεσίας Email
+1. Εκκινήστε την εφαρμογή
+2. Κάντε εγγραφή νέου χρήστη
+3. Ελέγξτε το inbox (και spam)
 
-You can test the email service by:
-1. Starting the application
-2. Registering a new user
-3. Checking the inbox (and spam folder) for verification email
-
-### Switching Back to MailHog
-
-If you want to switch back to MailHog for testing:
+### Επιστροφή σε MailHog (Test Mode)
 
 ```bash
-# Restore backup
+# Επαναφορά backup
 cp Ask/src/main/resources/application.properties.backup Ask/src/main/resources/application.properties
 
-# Or manually update application.properties:
+# Ή χειροκίνητα:
 spring.mail.host=mailhog
 spring.mail.port=1025
 spring.mail.username=
@@ -144,9 +135,7 @@ spring.mail.properties.mail.smtp.auth=false
 spring.mail.properties.mail.smtp.starttls.enable=false
 ```
 
-## Alternative Email Providers
-
-You can use other SMTP providers by updating the configuration:
+## Εναλλακτικοί Πάροχοι SMTP
 
 ### Outlook/Hotmail
 ```properties
@@ -172,19 +161,24 @@ spring.mail.username=your-mailgun-username
 spring.mail.password=your-mailgun-password
 ```
 
-## Files Modified
+## Αρχεία που Επηρεάζονται
 
-- `Ask/src/main/resources/application.properties` - Email configuration
-- `.gitignore` - Added entries for email credentials
-- `setup-email.sh` - Setup script for direct configuration
-- `setup-email-env.sh` - Setup script for environment variables
-- `run-with-email.sh` - Convenient run script (created by setup)
-- `.env` - Environment variables file (created by setup)
+- `Ask/src/main/resources/application.properties` - Ρύθμιση email
+- `.gitignore` - Αγνοεί credentials email
+- `setup-email.sh` - Script άμεσης ρύθμισης
+- `setup-email-env.sh` - Script ρύθμισης περιβάλλοντος
+- `run-with-email.sh` - Script εκκίνησης (δημιουργείται από setup)
+- `.env` - Αρχείο μεταβλητών περιβάλλοντος (δημιουργείται από setup)
 
-## Support
+## Υποστήριξη
 
-If you encounter issues:
-1. Check the application logs for detailed error messages
-2. Verify your Gmail App Password is correct
-3. Ensure 2-Step Verification is enabled
-4. Check if your Gmail account allows "less secure app access" (if applicable) 
+Αν αντιμετωπίσετε προβλήματα:
+1. Ελέγξτε τα logs της εφαρμογής για λεπτομέρειες
+2. Επαληθεύστε το App Password
+3. Βεβαιωθείτε ότι το 2-Step Verification είναι ενεργό
+4. Ελέγξτε αν ο λογαριασμός Gmail επιτρέπει "λιγότερο ασφαλείς εφαρμογές" (αν χρειάζεται)
+
+---
+
+**Cloud/HTTPS Σημείωση:**
+Για παραγωγική χρήση σε cloud περιβάλλον, προτιμήστε πάντα μεταβλητές περιβάλλοντος και ασφαλή αποθήκευση credentials (π.χ. Kubernetes Secrets). 

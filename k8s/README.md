@@ -1,71 +1,69 @@
-# Kubernetes Deployment Configuration
+# Ρυθμίσεις Ανάπτυξης Kubernetes
 
-## Overview
+## Επισκόπηση
 
-This directory contains all Kubernetes manifests for deploying the F-B-END application components. The deployment uses a microservices architecture with separate frontend and backend services, shared storage, and load balancing.
+Αυτός ο φάκελος περιέχει όλα τα Kubernetes manifests για την ανάπτυξη των εφαρμογών F-B-END. Η ανάπτυξη ακολουθεί αρχιτεκτονική microservices με ξεχωριστές υπηρεσίες frontend και backend, κοινόχρηστη αποθήκευση και load balancing.
 
-## Directory Structure
+## Δομή Φακέλου
 
 ```
 k8s/
-├── backend/                    # Backend application deployment
-│   ├── backend-deployment.yaml # Spring Boot application deployment
-│   └── backend-service.yaml    # Backend service configuration
-├── frontend/                   # Frontend application deployment
-│   ├── frontend-deployment.yaml # Vue.js application deployment
-│   └── frontend-service.yaml   # Frontend service configuration
-├── shared-storage.yaml         # Shared storage configuration
-└── README.md                   # This documentation
+├── backend/                    # Ανάπτυξη backend εφαρμογής
+│   ├── backend-deployment.yaml # Spring Boot deployment
+│   └── backend-service.yaml    # Service backend
+├── frontend/                   # Ανάπτυξη frontend εφαρμογής
+│   ├── frontend-deployment.yaml # Vue.js deployment
+│   └── frontend-service.yaml   # Service frontend
+├── shared-storage.yaml         # Κοινόχρηστη αποθήκευση
+└── README.md                   # Τεκμηρίωση
 ```
 
-## Components
+## Συνιστώμενα Σημεία
 
-### Backend Deployment
+### Ανάπτυξη Backend
 
 #### backend-deployment.yaml
-- **Image**: openjdk:17-jre-slim
-- **Port**: 8080
-- **Resources**: CPU and memory limits
-- **Health Checks**: Readiness and liveness probes
-- **Environment Variables**: Database connection, JWT configuration
-- **Volume Mounts**: Shared storage for JAR file
-- **Init Container**: Copies JAR file from shared storage
+- **Εικόνα**: openjdk:17-jre-slim
+- **Θύρα**: 8080
+- **Πόροι**: Όρια CPU και μνήμης
+- **Έλεγχοι Υγείας**: Readiness και liveness probes
+- **Μεταβλητές Περιβάλλοντος**: Σύνδεση DB, JWT
+- **Volume Mounts**: Κοινόχρηστη αποθήκευση για JAR
+- **Init Container**: Αντιγραφή JAR από shared storage
 
 #### backend-service.yaml
-- **Type**: LoadBalancer
-- **Port**: 8080
+- **Τύπος**: LoadBalancer
+- **Θύρα**: 8080
 - **Target Port**: 8080
-- **External Access**: Available on cluster IP
-- **Session Affinity**: None
+- **Εξωτερική Πρόσβαση**: Μέσω cluster IP
 
-### Frontend Deployment
+### Ανάπτυξη Frontend
 
 #### frontend-deployment.yaml
-- **Image**: nginx:alpine
-- **Port**: 80
-- **Resources**: CPU and memory limits
-- **Health Checks**: Readiness and liveness probes
-- **Volume Mounts**: Shared storage for dist files, nginx config
-- **Init Container**: Copies dist files from shared storage
-- **ConfigMap**: Nginx configuration for API routing
+- **Εικόνα**: nginx:alpine
+- **Θύρα**: 80
+- **Πόροι**: Όρια CPU και μνήμης
+- **Έλεγχοι Υγείας**: Readiness και liveness probes
+- **Volume Mounts**: Κοινόχρηστη αποθήκευση για dist, nginx config
+- **Init Container**: Αντιγραφή dist από shared storage
+- **ConfigMap**: Ρύθμιση nginx για API routing
 
 #### frontend-service.yaml
-- **Type**: LoadBalancer
-- **Port**: 80
+- **Τύπος**: LoadBalancer
+- **Θύρα**: 80
 - **Target Port**: 80
-- **External Access**: Available on cluster IP
-- **Session Affinity**: None
+- **Εξωτερική Πρόσβαση**: Μέσω cluster IP
 
-### Shared Storage
+### Κοινόχρηστη Αποθήκευση
 
 #### shared-storage.yaml
-- **Type**: PersistentVolumeClaim
+- **Τύπος**: PersistentVolumeClaim
 - **Storage Class**: Standard
 - **Access Mode**: ReadWriteMany
-- **Size**: 1Gi
-- **Purpose**: Share built artifacts between Jenkins and application pods
+- **Μέγεθος**: 1Gi
+- **Σκοπός**: Κοινή χρήση artifacts μεταξύ Jenkins και pods εφαρμογών
 
-## Deployment Architecture
+## Αρχιτεκτονική Ανάπτυξης
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -113,37 +111,35 @@ k8s/
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Key Features
+## Κύρια Χαρακτηριστικά
 
 ### Load Balancing
-- **MetalLB LoadBalancer**: Provides external IP addresses
-- **Service Discovery**: Internal cluster communication
-- **Health Checks**: Automatic failover and recovery
-- **Session Management**: Stateless application design
+- **MetalLB LoadBalancer**: Παρέχει εξωτερικές IP
+- **Service Discovery**: Εσωτερική επικοινωνία cluster
+- **Health Checks**: Αυτόματη αποκατάσταση
+- **Session Management**: Stateless design
 
-### Storage Management
-- **Shared PVC**: Jenkins and application pods share storage
-- **Init Containers**: Copy built artifacts to application pods
-- **Persistent Data**: Database and Jenkins data persistence
-- **Volume Mounts**: Proper file system access
+### Διαχείριση Αποθήκευσης
+- **Shared PVC**: Jenkins και pods μοιράζονται storage
+- **Init Containers**: Αντιγραφή artifacts
+- **Persistent Data**: Μόνιμα δεδομένα DB/Jenkins
+- **Volume Mounts**: Πρόσβαση στο file system
 
-### Security
-- **RBAC**: Role-based access control
-- **Service Accounts**: Pod authentication
-- **Network Policies**: Traffic isolation
-- **Secrets Management**: Sensitive data protection
+### Ασφάλεια
+- **RBAC**: Έλεγχος πρόσβασης
+- **Service Accounts**: Αυθεντικοποίηση pods
+- **Network Policies**: Απομόνωση traffic
+- **Secrets Management**: Προστασία ευαίσθητων δεδομένων
 
-### Monitoring
-- **Health Probes**: Application health monitoring
-- **Resource Limits**: CPU and memory constraints
-- **Logging**: Centralized log collection
-- **Metrics**: Performance monitoring
+### Παρακολούθηση
+- **Health Probes**: Έλεγχος υγείας εφαρμογών
+- **Resource Limits**: Όρια CPU/μνήμης
+- **Logging**: Κεντρική συλλογή logs
+- **Metrics**: Παρακολούθηση απόδοσης
 
-## Configuration Details
+## Ρυθμίσεις Backend
 
-### Backend Configuration
-
-#### Environment Variables
+#### Μεταβλητές Περιβάλλοντος
 ```yaml
 - name: SPRING_DATASOURCE_URL
   value: "jdbc:postgresql://postgres-service:5432/petdb"
@@ -157,7 +153,7 @@ k8s/
   value: "1025"
 ```
 
-#### Health Checks
+#### Έλεγχοι Υγείας
 ```yaml
 livenessProbe:
   httpGet:
@@ -173,9 +169,9 @@ readinessProbe:
   periodSeconds: 5
 ```
 
-### Frontend Configuration
+## Ρυθμίσεις Frontend
 
-#### Nginx Configuration
+#### Ρύθμιση Nginx
 ```nginx
 server {
     listen 80;
@@ -204,18 +200,18 @@ volumeMounts:
   subPath: nginx.conf
 ```
 
-## Deployment Process
+## Διαδικασία Ανάπτυξης
 
-### 1. Infrastructure Setup
+### 1. Υποδομή
 ```bash
-# Apply shared storage
+# Εφαρμογή shared storage
 kubectl apply -f shared-storage.yaml
 
-# Apply RBAC configuration
+# Εφαρμογή RBAC
 kubectl apply -f rbac-config.yaml
 ```
 
-### 2. Application Deployment
+### 2. Εφαρμογή
 ```bash
 # Deploy backend
 kubectl apply -f backend/
@@ -224,36 +220,36 @@ kubectl apply -f backend/
 kubectl apply -f frontend/
 ```
 
-### 3. Verification
+### 3. Επαλήθευση
 ```bash
-# Check pod status
+# Έλεγχος pods
 kubectl get pods -n devops-pets
 
-# Check services
+# Έλεγχος services
 kubectl get services -n devops-pets
 
-# Check ingress
+# Έλεγχος ingress
 kubectl get ingress -n devops-pets
 ```
 
-## Resource Requirements
+## Απαιτήσεις Πόρων
 
 ### Backend Pod
 - **CPU**: 500m (0.5 cores)
-- **Memory**: 512Mi
-- **Storage**: Shared volume access
+- **Μνήμη**: 512Mi
+- **Αποθήκευση**: Shared volume
 
 ### Frontend Pod
 - **CPU**: 200m (0.2 cores)
-- **Memory**: 256Mi
-- **Storage**: Shared volume access
+- **Μνήμη**: 256Mi
+- **Αποθήκευση**: Shared volume
 
 ### Shared Storage
-- **Size**: 1Gi
+- **Μέγεθος**: 1Gi
 - **Access Mode**: ReadWriteMany
 - **Storage Class**: Standard
 
-## Scaling Configuration
+## Scaling
 
 ### Horizontal Pod Autoscaling
 ```yaml
@@ -279,85 +275,90 @@ spec:
 
 ### Manual Scaling
 ```bash
-# Scale backend to 3 replicas
+# Scale backend σε 3 replicas
 kubectl scale deployment backend-deployment --replicas=3 -n devops-pets
 
-# Scale frontend to 2 replicas
+# Scale frontend σε 2 replicas
 kubectl scale deployment frontend-deployment --replicas=2 -n devops-pets
 ```
 
-## Troubleshooting
+## Επίλυση Προβλημάτων
 
-### Common Issues
+### Συχνά Προβλήματα
 
-#### Pod Not Starting
+#### Pod δεν ξεκινά
 ```bash
-# Check pod events
+# Έλεγχος pod events
 kubectl describe pod <pod-name> -n devops-pets
 
-# Check pod logs
+# Έλεγχος logs pod
 kubectl logs <pod-name> -n devops-pets
 ```
 
-#### Service Not Accessible
+#### Service μη προσβάσιμο
 ```bash
-# Check service endpoints
+# Έλεγχος endpoints
 kubectl get endpoints -n devops-pets
 
-# Test service connectivity
+# Τεστ συνδεσιμότητας
 kubectl run test-pod --image=busybox --rm -it --restart=Never -- nslookup backend-service
 ```
 
-#### Storage Issues
+#### Προβλήματα αποθήκευσης
 ```bash
-# Check PVC status
+# Έλεγχος PVC
 kubectl get pvc -n devops-pets
 
-# Check PV status
+# Έλεγχος PV
 kubectl get pv
 ```
 
-### Debugging Commands
+### Debugging
 ```bash
-# Port forward to debug
+# Port forward για debug
 kubectl port-forward <pod-name> 8080:8080 -n devops-pets
 
-# Execute commands in pod
+# Εκτέλεση εντολών σε pod
 kubectl exec -it <pod-name> -n devops-pets -- /bin/sh
 
-# Copy files from/to pod
+# Αντιγραφή αρχείων από/προς pod
 kubectl cp <pod-name>:/path/to/file ./local-file -n devops-pets
 ```
 
-## Maintenance
+## Συντήρηση
 
-### Updates
+### Ενημερώσεις
 - **Rolling Updates**: Zero-downtime deployments
-- **Rollback**: Quick rollback to previous versions
-- **Blue-Green**: Alternative deployment strategy
-- **Canary**: Gradual rollout for testing
+- **Rollback**: Επιστροφή σε προηγούμενη έκδοση
+- **Blue-Green**: Εναλλακτική στρατηγική ανάπτυξης
+- **Canary**: Σταδιακή διάθεση
 
 ### Backup
-- **Database**: Regular PostgreSQL backups
-- **Configuration**: Version control for manifests
-- **Data**: Persistent volume backups
-- **Logs**: Centralized log storage
+- **Database**: Τακτικά backup PostgreSQL
+- **Configuration**: Έλεγχος εκδόσεων manifests
+- **Data**: Backup persistent volumes
+- **Logs**: Κεντρική αποθήκευση logs
 
-### Monitoring
-- **Resource Usage**: CPU and memory monitoring
-- **Application Health**: Health check monitoring
-- **Network Traffic**: Service communication monitoring
-- **Storage Usage**: Volume capacity monitoring
+### Παρακολούθηση
+- **Χρήση Πόρων**: Παρακολούθηση CPU/μνήμης
+- **Υγεία Εφαρμογής**: Health checks
+- **Δίκτυο**: Παρακολούθηση traffic
+- **Αποθήκευση**: Παρακολούθηση χωρητικότητας
 
-## Access Points
+## Σημεία Πρόσβασης
 
-### External Access
-- **Frontend Application**: Port 80 (Standard) - External IP shown in Jenkins pipeline
-- **Backend API**: Port 8080 (Standard) - External IP shown in Jenkins pipeline
-- **Jenkins**: http://localhost:8082
+### Εξωτερική Πρόσβαση
+- **Frontend**: Port 80 (εξωτερικό IP από pipeline Jenkins)
+- **Backend API**: Port 8080 (εξωτερικό IP από pipeline Jenkins)
+- **Jenkins**: https://pet-system-devpets.swedencentral.cloudapp.azure.com
 - **MailHog**: http://localhost:8025
 
-### Internal Services
+### Εσωτερικές Υπηρεσίες
 - **PostgreSQL**: postgres-service:5432
 - **MailHog SMTP**: mailhog-service:1025
-- **Kubernetes API**: kubernetes.default.svc 
+- **Kubernetes API**: kubernetes.default.svc
+
+---
+
+**Cloud/HTTPS Σημείωση:**
+Για παραγωγική χρήση, προτείνεται η χρήση Ingress με HTTPS termination και cert-manager για αυτόματη έκδοση SSL certificates. 

@@ -30,16 +30,16 @@ F-B-END/
 
 ## Ανάπτυξη (Development)
 - **Backend**:
-  ```bash
-  cd Ask
-  ./mvnw spring-boot:run
-  ```
+```bash
+cd Ask
+./mvnw spring-boot:run
+```
 - **Frontend**:
-  ```bash
-  cd frontend
-  npm install
-  npm run dev
-  ```
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ## Deployment (CI/CD)
 1. **Αρχικό setup**: Στήσε το cluster μέσω Dpet (δες Dpet/README.md)
