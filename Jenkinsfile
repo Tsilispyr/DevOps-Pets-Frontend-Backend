@@ -415,6 +415,11 @@ EOF
                         kubectl apply -f k8s/minio/ -n ${NAMESPACE}
                         echo "OK! MinIO resources applied"
                         
+                        # Apply ingress for HTTPS frontend access
+                        echo "Applying ingress for HTTPS frontend access..."
+                        kubectl apply -f ingress.yaml
+                        echo "OK! Ingress applied"
+                        
                         # Wait for MinIO to be ready
                         echo "Waiting for MinIO to be ready..."
                         kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/minio -n ${NAMESPACE}
