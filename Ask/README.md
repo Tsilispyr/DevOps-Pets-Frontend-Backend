@@ -1,4 +1,4 @@
-# Ask - Spring Boot Backend (Ελληνικά)
+# Ask - Spring Boot Backend 
 
 ## Επισκόπηση
 Το Ask είναι το backend του DevPets, υλοποιημένο με Spring Boot 3.x (Java 17). Παρέχει RESTful APIs για διαχείριση χρηστών, ζώων, αιτημάτων υιοθεσίας και email notifications.
