@@ -5,6 +5,7 @@
 - Spring Boot backend (Java 17, JWT, PostgreSQL, MinIO, Mailhog)
 - Vue.js frontend (Vite, Pinia, Bootstrap)
 - Όλα τα Kubernetes manifests για deployment
+- **HTTPS ingress με cert-manager**
 - Jenkinsfile για CI/CD pipeline
 
 ## Σύνδεση με Dpet
@@ -45,12 +46,17 @@ F-B-END/
 2. **Pipeline**:
    - Πρόσβαση στο Jenkins: http://localhost:8082
    - Δημιούργησε pipeline job που δείχνει σε αυτό το repo
-   - Τρέξε το pipeline (checkout, build, deploy, verify)
+   - Τρέξε το pipeline (checkout, build, deploy, verify, HTTPS)
 3. **Πρόσβαση**:
-   - Frontend: http://localhost:8081
-   - Backend API: http://localhost:8080/api
-   - MailHog: http://localhost:8025
-   - MinIO: http://localhost:9000
+   - **Local Development**:
+     - Frontend: http://localhost:8081
+     - Backend API: http://localhost:8080/api
+     - MailHog: http://localhost:8025
+     - MinIO: http://localhost:9000
+   - **Cloud Production**:
+     - Frontend: https://pet-system.com
+     - Backend API: http://localhost:8080/api (port-forward)
+     - MailHog: http://localhost:8025 (port-forward)
 
 ## Καθημερινή Χρήση
 - Κάνε αλλαγές στον κώδικα (frontend ή backend)
@@ -62,7 +68,11 @@ F-B-END/
 - Logs: `kubectl logs <pod> -n devops-pets`
 - Services: `kubectl get svc -n devops-pets`
 - Ingress: `kubectl get ingress -n devops-pets`
+- **HTTPS/Certificates**: `kubectl get certificates -n devops-pets`
+- **Cert-manager**: `kubectl get pods -n cert-manager`
 
 ## Σημειώσεις
 - Όλα τα credentials περνάνε μέσω Kubernetes secrets
+- **HTTPS certificates** δημιουργούνται αυτόματα από Let's Encrypt
+- **Frontend είναι public HTTPS**, backend είναι internal με port-forwarding
 - Για πλήρη αρχιτεκτονική και αυτοματοποίηση, δες το `FULL_PROJECT_OVERVIEW.md`
