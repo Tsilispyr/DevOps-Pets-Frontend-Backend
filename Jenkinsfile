@@ -415,6 +415,17 @@ EOF
                         kubectl apply -f k8s/minio/ -n ${NAMESPACE}
                         echo "OK! MinIO resources applied"
                         
+                        # Generate and apply self-signed certificates for application
+                        echo "Generating self-signed certificates for application..."
+                        chmod +x generate-application-certs.sh
+                        ./generate-application-certs.sh
+                        
+                        echo "Applying application certificates..."
+                        kubectl apply -f frontend-tls-secret.yaml
+                        kubectl apply -f minio-tls-secret.yaml
+                        kubectl apply -f pet-system-tls-secret.yaml
+                        echo "OK! Application certificates applied"
+                        
                         # Apply ingress for HTTPS frontend access
                         echo "Applying ingress for HTTPS frontend access..."
                         kubectl apply -f ingress.yaml
