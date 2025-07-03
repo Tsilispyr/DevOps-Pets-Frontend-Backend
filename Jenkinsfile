@@ -420,6 +420,11 @@ EOF
                         kubectl apply -f ingress.yaml
                         echo "OK! Ingress applied"
                         
+                        # Apply MinIO ingress for HTTPS access
+                        echo "Applying MinIO ingress for HTTPS access..."
+                        kubectl apply -f k8s/minio/minio-ingress.yaml
+                        echo "OK! MinIO ingress applied"
+                        
                         # Wait for MinIO to be ready
                         echo "Waiting for MinIO to be ready..."
                         kubectl wait --for=condition=available --timeout=${TIMEOUT} deployment/minio -n ${NAMESPACE}
@@ -633,7 +638,14 @@ EOF
                         echo "- Backend API: http://localhost:3000/api (when port forwarding starts)"
                         echo ""
                         echo "=== FOR USERS (Browser Access) ==="
-                        echo "Wait for Devpets-main to start port forwarding, then access:"
+                        echo "HTTPS Access via Ingress (when certificates are ready):"
+                        echo "  Frontend: https://petsystem46.swedencentral.cloudapp.azure.com"
+                        echo "  Backend API: https://api.petsystem46.swedencentral.cloudapp.azure.com"
+                        echo "  MinIO Console: https://minio.petsystem46.swedencentral.cloudapp.azure.com"
+                        echo "  Jenkins: https://jenkins.petsystem46.swedencentral.cloudapp.azure.com"
+                        echo "  MailHog: https://mailhog.petsystem46.swedencentral.cloudapp.azure.com"
+                        echo ""
+                        echo "Local Development (when port forwarding starts):"
                         echo "  Frontend: http://localhost:3000"
                         echo "  Backend API: http://localhost:3000/api"
                     '''
@@ -710,7 +722,14 @@ EOF
                         echo "Devpets-main Ansible will now detect these applications"
                         echo "and start port forwarding automatically."
                         echo ""
-                        echo "Access URLs (when port forwarding starts):"
+                        echo "Access URLs:"
+                        echo "- Frontend: https://petsystem46.swedencentral.cloudapp.azure.com"
+                        echo "- Backend API: https://api.petsystem46.swedencentral.cloudapp.azure.com"
+                        echo "- MinIO Console: https://minio.petsystem46.swedencentral.cloudapp.azure.com"
+                        echo "- Jenkins: https://jenkins.petsystem46.swedencentral.cloudapp.azure.com"
+                        echo "- MailHog: https://mailhog.petsystem46.swedencentral.cloudapp.azure.com"
+                        echo ""
+                        echo "Local Development (when port forwarding starts):"
                         echo "- Frontend: http://localhost:3000"
                         echo "- Backend API: http://localhost:3000/api"
                         echo "========================================"
