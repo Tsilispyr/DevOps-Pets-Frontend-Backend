@@ -53,7 +53,9 @@ export default {
         if (this.imageFile && animalId) {
           const formData = new FormData();
           formData.append('file', this.imageFile);
-          await api.post(`/files/upload-animal-image/${animalId}`, formData);
+          await api.post(`/files/upload-animal-image/${animalId}`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
         }
         this.$router.push('/animals');
       } catch (e) {
