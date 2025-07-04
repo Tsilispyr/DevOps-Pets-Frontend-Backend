@@ -61,6 +61,18 @@ public class AnimalService {
         }
         return animals;
     }
+
+    /**
+     * Επιστρέφει ένα Animal με ενημερωμένο imageUrl (presigned URL) αν είναι filename
+     */
+    @Transactional
+    public Animal getAnimalWithPresignedUrl(Animal animal) {
+        if (animal != null && animal.getImageUrl() != null && !animal.getImageUrl().startsWith("http")) {
+            String presignedUrl = fileStorageService.generatePublicUrl(animal.getImageUrl());
+            animal.setImageUrl(presignedUrl);
+        }
+        return animal;
+    }
 }
 
 
