@@ -1,6 +1,6 @@
 <template>
   <div v-if="animal">
-    <img :src="animal.imageUrl || defaultImage" alt="Εικόνα ζώου" style="max-width:200px;max-height:200px;object-fit:cover;margin-bottom:12px;" />
+    <img :src="getAnimalImageUrl(animal.imageUrl)" alt="Εικόνα ζώου" style="max-width:200px;max-height:200px;object-fit:cover;margin-bottom:12px;" />
     <h2>Λεπτομέρειες Ζώου</h2>
     <p><strong>Όνομα:</strong> {{ animal.name }}</p>
     <p><strong>Είδος:</strong> {{ animal.type }}</p>
@@ -29,6 +29,12 @@ export default {
       this.animal = res.data;
     } catch (e) {
       this.animal = null;
+    }
+  },
+  methods: {
+    getAnimalImageUrl(imageUrl) {
+      if (!imageUrl) return this.defaultImage;
+      return `http://localhost:8080/api/files/image/${imageUrl}`;
     }
   }
 };

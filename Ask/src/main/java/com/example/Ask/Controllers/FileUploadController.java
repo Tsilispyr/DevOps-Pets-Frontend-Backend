@@ -47,18 +47,18 @@ public class FileUploadController {
         System.out.println("UPLOAD: /upload-animal-image endpoint called, animalId=" + animalId + ", file=" + (file != null ? file.getOriginalFilename() : "null"));
         try {
             // Upload image to MinIO
-            String imageUrl = fileStorageService.uploadImage(file);
-            
-            // Update animal record with image URL
+            String filename = fileStorageService.uploadImage(file);
+
+            // Update animal record with image filename
             Animal animal = animalService.getAnimal(animalId);
             if (animal != null) {
-                animal.setImageUrl(imageUrl);
+                animal.setImageUrl(filename);
                 animalService.saveAnimal(animal);
-                
+
                 Map<String, String> response = new HashMap<>();
-                response.put("imageUrl", imageUrl);
+                response.put("imageUrl", filename);
                 response.put("message", "Animal image uploaded successfully");
-                
+
                 return ResponseEntity.ok(response);
             } else {
                 Map<String, String> response = new HashMap<>();

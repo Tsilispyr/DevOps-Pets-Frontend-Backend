@@ -34,26 +34,23 @@ public class AnimalController {
 
     @RequestMapping("")
     public List<Animal> showAnimals() {
-        return animalservice.getAnimalsWithPresignedUrls();
+        return animalservice.getAnimals();
     }
 
     @GetMapping("/{id}")
     public Animal showAnimal(@PathVariable Integer id){
-        Animal animal = animalservice.getAnimal(id);
-        return animalservice.getAnimalWithPresignedUrl(animal);
+        return animalservice.getAnimal(id);
     }
 
     @PostMapping("")
     public Animal createAnimal(@RequestBody Animal animal) {
-        Animal saved = animalservice.saveAnimal(animal);
-        return animalservice.getAnimalWithPresignedUrl(saved);
+        return animalservice.saveAnimal(animal);
     }
 
     @PutMapping("/{id}")
     public Animal updateAnimal(@PathVariable Integer id, @RequestBody Animal animal) {
         animal.setId(id);
-        Animal saved = animalservice.saveAnimal(animal);
-        return animalservice.getAnimalWithPresignedUrl(saved);
+        return animalservice.saveAnimal(animal);
     }
 
     @DeleteMapping("/{id}")

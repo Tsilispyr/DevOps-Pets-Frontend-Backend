@@ -22,15 +22,10 @@ public class FileStorageService {
 
     public String uploadImage(MultipartFile file) {
         try {
-            // Log MinIO credentials
-            System.out.println("MinIO Access Key (upload): " + minioConfig.getAccessKey());
-            System.out.println("MinIO Secret Key (upload): " + minioConfig.getSecretKey());
-            // Generate unique filename
             String originalFilename = file.getOriginalFilename();
             String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
             String filename = UUID.randomUUID().toString() + extension;
 
-            // Upload file to MinIO
             minioClient.putObject(
                 PutObjectArgs.builder()
                     .bucket(minioConfig.getBucket())
@@ -40,9 +35,7 @@ public class FileStorageService {
                     .build()
             );
 
-            // Generate public URL
-            return generatePublicUrl(filename);
-
+            return filename;
         } catch (Exception e) {
             throw new RuntimeException("Failed to upload image: " + e.getMessage(), e);
         }

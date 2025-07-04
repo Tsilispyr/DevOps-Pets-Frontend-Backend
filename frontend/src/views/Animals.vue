@@ -6,7 +6,7 @@
     <ul v-else>
       <li v-for="a in animals" :key="a.id" class="animal-card">
         <div class="animal-image-box">
-          <img :src="a.imageUrl || defaultImage" alt="Εικόνα ζώου" />
+          <img :src="getAnimalImageUrl(a.imageUrl)" alt="Εικόνα ζώου" />
         </div>
         <h3>{{ a.name }}</h3>
         <p>Είδος: {{ a.type }}</p>
@@ -52,6 +52,11 @@ export default {
       .catch(() => alert('Σφάλμα ανάκτησης ζώων'))
   },
   methods: {
+    getAnimalImageUrl(imageUrl) {
+      if (!imageUrl) return this.defaultImage;
+      // Example: if images are served from /api/files/image/{filename}
+      return `http://localhost:8080/api/files/image/${imageUrl}`;
+    },
     async requestAnimal(id) {
       await fetch(`http://localhost:8080/api/animals/Request/${id}`, {
         method: 'PUT',
